@@ -1,0 +1,90 @@
+import { NextResponse } from "next/server";
+import { getSessionAddress } from "@/lib/session";
+import { getHolderStatus, type ChogToken } from "@/lib/chog";
+import { dailyLimit, type Tier } from "@/lib/tiers";
+import { addUse, allowBurst, clientIp, getUsed } from "@/lib/limits";
+import { createVideo } from "@/lib/video";
+import { saveJob } from "@/lib/jobs";
+import { fail, readJson } from "@/lib/http";
+
+const MAX_IMAGE_CHARS = 2_000_000; // ~1.5 MB after base64
+const DATA_URL = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+
+type Body = { prompt?: string; tokenId?: string; image?: string };
+
+function cleanPrompt(p: unknown) {
+  if (typeof p !== "string") return null;
+  const s = p.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+  return s.length >= 3 && s.length <= 500 ? s : null;
+}
+
+function holderPrompt(prompt: string, token: ChogToken) {
+  const traits = token.traits.map((t) => `${t.trait_type.toLowerCase()}: ${t.value}`).join(", ");
+  return [
+    prompt,
+    `The main character is the Chog from the reference image (${token.name})`,
+    traits ? `with these traits: ${traits}.` : ".",
+    "Keep its exact face, colors and accessories. Cinematic lighting, smooth camera motion.",
+  ].join(" ");
+}
+
+export async function POST(req: Request) {
+  const address = await getSessionAddress();
+  if (!address) return fail(401, "Sign in with your wallet first.");
+
+  const body = await readJson<Body>(req);
+  if (!body) return fail(400, "Invalid request body.");
+
+  const prompt = cleanPrompt(body.prompt);
+  if (!prompt) return fail(400, "Prompt must be 3 to 500 characters.");
+
+  // Ownership is re-checked on every generation. The client never decides the tier.
+  let status;
+  try {
+    status = await getHolderStatus(address);
+  } catch (e) {
+    console.error("[generate] ownership check failed", e);
+    return fail(502, "Could not verify your Chog right now. Try again.");
+  }
+  const tier: Tier = status.holder ? "holder" : "free";
+
+  const limit = dailyLimit(tier);
+  const used = getUsed(address);
+  if (used >= limit) {
+    return fail(403, tier === "free" ? "Daily free limit reached. Hold a Chog to unlock more." : "Daily limit reached.", {
+      used,
+      limit,
+    });
+  }
+
+  let image: string;
+  let finalPrompt = prompt;
+
+  if (tier === "holder" && body.tokenId != null && body.tokenId !== "") {
+    const token = status.tokens.find((t) => t.tokenId === String(body.tokenId));
+    if (!token) return fail(403, "That Chog is not in your wallet.");
+    image = token.image;
+    finalPrompt = holderPrompt(prompt, token);
+  } else {
+    if (typeof body.image !== "string" || !DATA_URL.test(body.image)) {
+      return fail(400, "Upload a PNG, JPG or WebP image.");
+    }
+    if (body.image.length > MAX_IMAGE_CHARS) return fail(413, "Image is too large. Use one under 1.5 MB.");
+    image = body.image;
+  }
+
+  // Burst limit applies to valid requests only, right before we spend provider credits
+  if (!allowBurst(`gen:${address}`, 3, 60_000) || !allowBurst(`gen-ip:${clientIp(req)}`, 6, 60_000)) {
+    return fail(429, "Slow down. Max 3 generations per minute.");
+  }
+
+  try {
+    const id = await createVideo({ tier, image, prompt: finalPrompt });
+    saveJob({ id, address, tier, prompt, createdAt: Date.now() });
+    addUse(address);
+    return NextResponse.json({ id, tier, used: used + 1, limit });
+  } catch (e) {
+    console.error("[generate] provider error", e);
+    return fail(502, "The video service rejected the request. Try a different image or prompt.");
+  }
+}
