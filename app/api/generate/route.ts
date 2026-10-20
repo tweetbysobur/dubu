@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionAddress } from "@/lib/session";
-import { getHolderStatus, type ChogToken } from "@/lib/chog";
+import { getHolderStatus, getOwnedToken, type ChogToken } from "@/lib/chog";
 import { dailyLimit, type Tier } from "@/lib/tiers";
 import { addUse, allowBurst, clientIp, getUsed } from "@/lib/limits";
 import { createVideo } from "@/lib/video";
@@ -61,7 +61,15 @@ export async function POST(req: Request) {
   let finalPrompt = prompt;
 
   if (tier === "holder" && body.tokenId != null && body.tokenId !== "") {
-    const token = status.tokens.find((t) => t.tokenId === String(body.tokenId));
+    const id = String(body.tokenId);
+    let token = status.tokens.find((t) => t.tokenId === id) ?? null;
+    if (!token) {
+      try {
+        token = await getOwnedToken(address, id);
+      } catch {
+        return fail(502, "Could not load your Chog's metadata. Try again.");
+      }
+    }
     if (!token) return fail(403, "That Chog is not in your wallet.");
     image = token.image;
     finalPrompt = holderPrompt(prompt, token);

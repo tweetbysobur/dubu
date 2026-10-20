@@ -46,6 +46,10 @@ const me = await call("/api/me");
 expect("me after sign-in", me.status, 200);
 expect("random wallet is free tier", me.data.tier, "free");
 
+expect("token lookup needs session", (await call("/api/token/1", null, { noCookie: true })).status, 401);
+expect("token lookup rejects bad id", (await call("/api/token/abc")).status, 400);
+expect("token not owned is refused", (await call("/api/token/1")).status, 403);
+
 expect("short prompt rejected", (await call("/api/generate", { prompt: "hi", image: PNG })).status, 400);
 expect("free tier cannot use tokenId", (await call("/api/generate", { prompt: "chog rocket", tokenId: "0" })).status, 400);
 expect("non-image rejected", (await call("/api/generate", { prompt: "chog rocket", image: "data:text/plain;base64,aGk=" })).status, 400);

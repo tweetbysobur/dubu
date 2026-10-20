@@ -21,7 +21,7 @@ With no `REPLICATE_API_TOKEN`, Dubu runs in demo mode and returns a sample clip 
 | `NEXT_PUBLIC_MONAD_NETWORK` | `mainnet` (chain 143) or `testnet` (chain 10143) |
 | `SESSION_SECRET` | Signs the session cookie. 32+ chars. Required in production |
 | `NEXT_PUBLIC_WC_PROJECT_ID` | WalletConnect project ID. Injected wallets work without it |
-| `CHOG_CONTRACT_ADDRESS` | Chog ERC-721 contract. Without it, every wallet is free tier |
+| `CHOG_CONTRACT_ADDRESS` | Chog Genesis ERC-721, `0xc96d31f8626c6d03fae5dcd3d61e3fb9f4a73763` on mainnet. Without it, every wallet is free tier |
 | `ALCHEMY_API_KEY` | Lists token IDs when the contract is not ERC721Enumerable |
 | `REPLICATE_API_TOKEN` | Video provider key. Server only |
 | `REPLICATE_MODEL` | Image-to-video model. Default `wan-video/wan-2.2-i2v-fast` |
@@ -33,7 +33,7 @@ With no `REPLICATE_API_TOKEN`, Dubu runs in demo mode and returns a sample clip 
 
 1. Wallet connects with RainbowKit on Monad.
 2. The user signs a nonce message. `/api/auth/verify` checks it with viem (EOAs and EIP-1271 smart wallets) and sets an httpOnly session cookie.
-3. `/api/me` reads `balanceOf` on the Chog contract for the signed-in wallet, then loads token metadata, image and traits.
+3. `/api/me` reads `balanceOf` on the Chog contract for the signed-in wallet, then lists its tokens (ERC721Enumerable, then Alchemy) and loads metadata, image and traits. If neither can list them, the holder enters a token ID and `/api/token/:id` accepts it only when `ownerOf` matches the wallet.
 4. `/api/generate` re-checks ownership on every call. The client never decides the tier. Holders can only pick a token they own. Traits are appended to the prompt.
 5. The server calls Replicate. The browser polls `/api/jobs/:id` and plays the video from `/api/jobs/:id/video`, which streams through the backend. The browser never talks to the provider.
 6. Free-tier downloads get the watermark burned in client-side (WebM). Holder downloads are the original MP4.

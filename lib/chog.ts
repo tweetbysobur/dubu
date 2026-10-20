@@ -9,7 +9,10 @@ const abi = parseAbi([
   "function balanceOf(address owner) view returns (uint256)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
   "function tokenURI(uint256 tokenId) view returns (string)",
+  "function ownerOf(uint256 tokenId) view returns (address)",
 ]);
+
+export const TOKEN_ID = /^\d{1,7}$/;
 
 export const client = createPublicClient({
   chain: activeChain,
@@ -84,6 +87,23 @@ async function tokensFromAlchemy(owner: Address): Promise<ChogToken[]> {
     image: resolveUri(n.image?.cachedUrl ?? n.image?.originalUrl ?? n.raw?.metadata?.image ?? ""),
     traits: toTraits(n.raw?.metadata?.attributes),
   }));
+}
+
+/**
+ * Fallback when the wallet's tokens cannot be listed: the holder names a token ID
+ * and we only accept it if ownerOf matches the signed-in wallet.
+ */
+export async function getOwnedToken(address: string, tokenId: string): Promise<ChogToken | null> {
+  if (!contract || !isAddress(address) || !TOKEN_ID.test(tokenId)) return null;
+  let owner: Address;
+  try {
+    owner = await client.readContract({ address: contract, abi, functionName: "ownerOf", args: [BigInt(tokenId)] });
+  } catch {
+    return null; // nonexistent token
+  }
+  if (owner.toLowerCase() !== address.toLowerCase()) return null;
+  const token = await tokenFromChain(BigInt(tokenId));
+  return token.image ? token : null;
 }
 
 export async function getHolderStatus(address: string): Promise<HolderStatus> {

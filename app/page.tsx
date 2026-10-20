@@ -9,6 +9,7 @@ import { api, type Me } from "@/lib/api";
 import { Alert, Button, Card } from "@/components/ui";
 import { ChogPicker } from "@/components/ChogPicker";
 import { ImageUpload } from "@/components/ImageUpload";
+import { TokenIdLoader } from "@/components/TokenIdLoader";
 
 type TierFacts = Record<"holder" | "free", { quality: string; watermark: boolean; limit: number }>;
 
@@ -104,7 +105,8 @@ function Studio({ me }: { me: Me }) {
   const router = useRouter();
   const qc = useQueryClient();
   const holder = me.tier === "holder";
-  const hasChogImage = holder && me.tokens.length > 0;
+  const [tokens, setTokens] = useState(me.tokens);
+  const hasChogImage = holder && tokens.length > 0;
 
   const [tokenId, setTokenId] = useState<string | null>(me.tokens[0]?.tokenId ?? null);
   const [upload, setUpload] = useState<string | null>(null);
@@ -154,12 +156,16 @@ function Studio({ me }: { me: Me }) {
       <Card className="space-y-4">
         <h2 className="font-semibold">1. Image</h2>
         {hasChogImage ? (
-          <ChogPicker tokens={me.tokens} selected={tokenId} onSelect={setTokenId} />
+          <ChogPicker tokens={tokens} selected={tokenId} onSelect={setTokenId} />
+        ) : holder ? (
+          <TokenIdLoader
+            onLoaded={(t) => {
+              setTokens([t]);
+              setTokenId(t.tokenId);
+            }}
+          />
         ) : (
-          <>
-            {holder && <p className="text-sm text-mute">We confirmed your Chog but could not load its image. Upload it here.</p>}
-            <ImageUpload value={upload} onChange={setUpload} />
-          </>
+          <ImageUpload value={upload} onChange={setUpload} />
         )}
       </Card>
 
