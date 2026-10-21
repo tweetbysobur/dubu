@@ -33,6 +33,9 @@ export type Me = {
   mock: boolean;
 };
 
+type TierFact = { label: string; quality: string; watermark: boolean; limit: number };
+export type TierFacts = { holder: TierFact; free: TierFact; clipSeconds: number | null };
+
 export type JobStatus = {
   id: string;
   status: "processing" | "succeeded" | "failed";

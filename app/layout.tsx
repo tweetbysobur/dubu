@@ -1,22 +1,24 @@
 import type { Metadata, Viewport } from "next";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/bricolage-grotesque";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Header } from "@/components/Header";
 
 export const metadata: Metadata = {
-  title: "Dubu: Chog video generator",
-  description: "Turn your Chog into a short AI video. Built on Monad.",
+  title: "Dubu: turn your Chog into a video",
+  description: "Upload an image, write one sentence, get a short video. Chog Genesis holders get the full studio.",
 };
 
-export const viewport: Viewport = { themeColor: "#0b0a10" };
+export const viewport: Viewport = { themeColor: "#ffffff" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-dvh">
+      <body className="min-h-dvh bg-white font-sans text-ink">
         <Providers>
           <Header />
-          <main className="mx-auto w-full max-w-3xl px-4 pb-20 pt-6 sm:pt-10">{children}</main>
+          {children}
         </Providers>
       </body>
     </html>

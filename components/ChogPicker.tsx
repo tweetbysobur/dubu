@@ -14,47 +14,48 @@ export function ChogPicker({
   const active = tokens.find((t) => t.tokenId === selected) ?? tokens[0];
 
   return (
-    <div className="flex flex-col gap-4 sm:flex-row">
+    <div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={active.image}
-        alt={active.name}
-        className="aspect-square w-full max-w-60 rounded-xl border border-monad/50 object-cover"
-      />
-      <div className="min-w-0 flex-1">
-        <p className="font-semibold">{active.name}</p>
-        {active.traits.length > 0 ? (
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {active.traits.map((t) => (
-              <li key={t.trait_type} className="rounded-lg border border-line px-2 py-1 text-xs">
-                <span className="text-mute">{t.trait_type}:</span> {t.value}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-2 text-sm text-mute">No traits found in metadata.</p>
-        )}
-        <p className="mt-3 text-xs text-mute">Traits are added to your prompt so the video keeps your Chog's look.</p>
+      <img src={active.image} alt={active.name} className="aspect-square w-full rounded-2xl bg-surface object-cover" />
+      <p className="mt-4 font-display text-lg font-bold tracking-[-0.01em]">{active.name}</p>
 
-        {tokens.length > 1 && (
-          <div className="mt-4 flex gap-2" role="radiogroup" aria-label="Choose a Chog">
-            {tokens.map((t) => (
+      {active.traits.length > 0 ? (
+        <>
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            {active.traits.map((t) => (
+              <div key={t.trait_type} className="min-w-0">
+                <dt className="text-mute">{t.trait_type}</dt>
+                <dd className="truncate font-medium">{t.value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-4 text-sm leading-relaxed text-mute">Dubu adds these traits to your prompt to keep your Chog's look.</p>
+        </>
+      ) : (
+        <p className="mt-2 text-sm text-mute">No traits found in this Chog's metadata.</p>
+      )}
+
+      {tokens.length > 1 && (
+        <div className="mt-5 flex flex-wrap gap-2" role="radiogroup" aria-label="Choose a Chog">
+          {tokens.map((t) => {
+            const on = t.tokenId === active.tokenId;
+            return (
               <button
                 key={t.tokenId}
+                type="button"
                 role="radio"
-                aria-checked={t.tokenId === active.tokenId}
+                aria-checked={on}
+                aria-label={t.name}
                 onClick={() => onSelect(t.tokenId)}
-                className={`size-12 overflow-hidden rounded-lg border-2 ${
-                  t.tokenId === active.tokenId ? "border-monad" : "border-transparent opacity-60 hover:opacity-100"
-                }`}
+                className={`size-14 overflow-hidden rounded-xl border-2 ${on ? "border-brand" : "border-transparent opacity-70 hover:opacity-100"}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={t.image} alt={t.name} className="size-full object-cover" />
+                <img src={t.image} alt="" className="size-full object-cover" />
               </button>
-            ))}
-          </div>
-        )}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

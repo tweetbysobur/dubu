@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { dailyLimit, TIER_INFO } from "@/lib/tiers";
+import { clipSeconds, dailyLimit, TIER_INFO } from "@/lib/tiers";
 
 export const dynamic = "force-dynamic";
 
@@ -8,5 +8,6 @@ export function GET() {
   return NextResponse.json({
     holder: { ...TIER_INFO.holder, limit: dailyLimit("holder") },
     free: { ...TIER_INFO.free, limit: dailyLimit("free") },
+    clipSeconds: clipSeconds(),
   });
 }

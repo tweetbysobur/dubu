@@ -6,7 +6,14 @@ import { useParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, ApiError, type JobStatus } from "@/lib/api";
 import { burnWatermark, saveBlob } from "@/lib/watermark";
-import { Alert, Button, Card, Spinner } from "@/components/ui";
+import { Alert, Button, Container, buttonClass } from "@/components/ui";
+import { Mascot, type Mood } from "@/components/Mascot";
+
+function fileStamp() {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
 
 export default function ResultPage() {
   const { id } = useParams<{ id: string }>();
@@ -19,7 +26,7 @@ export default function ResultPage() {
     retry: (count, err) => !(err instanceof ApiError && [401, 403, 404].includes(err.status)) && count < 3,
   });
 
-  const processing = job.isPending || job.data?.status === "processing";
+  const processing = !job.isError && (job.isPending || job.data?.status === "processing");
   useEffect(() => {
     if (!processing) return;
     const t = setInterval(() => setElapsed((s) => s + 1), 1000);
@@ -30,102 +37,120 @@ export default function ResultPage() {
     mutationFn: async () => {
       const data = job.data!;
       const res = await fetch(data.videoUrl!, { credentials: "same-origin" });
-      if (!res.ok) throw new Error("Could not download the video.");
+      if (!res.ok) throw new Error("Dubu could not download the video. Try again.");
       const blob = await res.blob();
-      if (data.watermark) saveBlob(await burnWatermark(blob), `dubu-${id.slice(0, 8)}.webm`);
-      else saveBlob(blob, `dubu-chog-${id.slice(0, 8)}.mp4`);
+      if (data.watermark) saveBlob(await burnWatermark(blob), `dubu-${fileStamp()}.webm`);
+      else saveBlob(blob, `dubu-${fileStamp()}.mp4`);
     },
   });
 
+  const failed = job.data?.status === "failed";
+  const done = job.data?.status === "succeeded" && !!job.data.videoUrl;
+  const mood: Mood = job.isError || failed ? "oops" : done ? "done" : "rolling";
+
+  const title = job.isError
+    ? "Dubu could not find this video"
+    : failed
+      ? "This video did not come out"
+      : done
+        ? "Your video is ready"
+        : "Dubu is filming";
+
+  const authError = job.error instanceof ApiError && job.error.status === 401;
+  const goneError = job.error instanceof ApiError && [403, 404].includes(job.error.status);
+
   return (
-    <div className="space-y-6">
-      <Link href="/" className="text-sm text-mute hover:text-white">
-        ← New video
-      </Link>
+    <main>
+      <Container className="max-w-3xl py-8 sm:py-12">
+        <Link href="/" className="text-sm font-medium text-mute hover:text-ink">
+          Back to studio
+        </Link>
 
-      {job.isError && (
-        <Card className="space-y-4">
-          <Alert>{job.error.message}</Alert>
-          {job.error instanceof ApiError && job.error.status === 401 ? (
-            <Link href="/" className="text-sm text-monad-soft">
-              Sign in again
-            </Link>
-          ) : job.error instanceof ApiError && [403, 404].includes(job.error.status) ? (
-            <Link href="/" className="text-sm text-monad-soft">
-              Make a new video
-            </Link>
-          ) : (
-            <Button variant="ghost" onClick={() => job.refetch()}>
-              Retry
-            </Button>
-          )}
-        </Card>
-      )}
-
-      {!job.isError && processing && (
-        <Card className="space-y-4" aria-busy>
-          <div className="flex items-center gap-3">
-            <Spinner className="text-monad" />
-            <p className="font-semibold">Generating your video</p>
-          </div>
-          <div className="skeleton aspect-video w-full rounded-xl" />
-          <p className="text-sm text-mute">
-            {elapsed}s elapsed. Most clips take 30 to 90 seconds. You can leave this tab open.
-          </p>
-        </Card>
-      )}
-
-      {job.data?.status === "failed" && (
-        <Card className="space-y-4">
-          <Alert>{job.data.error ?? "Generation failed."}</Alert>
-          <p className="text-sm text-mute">Failed generations still count toward today's limit.</p>
-          <Link href="/" className="inline-block text-sm text-monad-soft">
-            Try a different prompt
-          </Link>
-        </Card>
-      )}
-
-      {job.data?.status === "succeeded" && job.data.videoUrl && (
-        <Card className="space-y-5">
-          <div className="relative overflow-hidden rounded-xl bg-black">
-            <video
-              src={job.data.videoUrl}
-              controls
-              autoPlay
-              loop
-              playsInline
-              className="aspect-video w-full object-contain"
-            />
-            {job.data.watermark && (
-              <span className="pointer-events-none absolute bottom-12 right-3 text-sm font-semibold text-white/80 drop-shadow">
-                Made with Dubu
-              </span>
+        <div className="mt-6 flex items-center gap-4">
+          <Mascot mood={mood} size={88} className="h-auto w-16 shrink-0 sm:w-20" decorative={false} />
+          <div aria-live="polite">
+            <h1 className="font-display text-[30px] font-extrabold leading-tight tracking-[-0.035em] sm:text-4xl">{title}</h1>
+            {processing && (
+              <p className="mt-1 tabular-nums text-mute">{elapsed}s so far. Keep this page open.</p>
             )}
           </div>
+        </div>
 
-          <div>
-            <p className="text-xs uppercase tracking-wide text-mute">Prompt</p>
-            <p className="mt-1">{job.data.prompt}</p>
+        {processing && <div className="skeleton mt-8 aspect-video w-full rounded-3xl" aria-hidden />}
+
+        {job.isError && (
+          <div className="mt-8 space-y-5">
+            <Alert>{authError ? "Your sign-in expired. Sign in again to see this video." : job.error.message}</Alert>
+            {authError ? (
+              <Link href="/" className={buttonClass("primary")}>
+                Sign in again
+              </Link>
+            ) : goneError ? (
+              <Link href="/" className={buttonClass("primary")}>
+                Make a new video
+              </Link>
+            ) : (
+              <Button variant="ghost" onClick={() => job.refetch()}>
+                Try again
+              </Button>
+            )}
           </div>
+        )}
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button loading={download.isPending} onClick={() => download.mutate()}>
-              {download.isPending ? (job.data.watermark ? "Adding watermark" : "Preparing") : "Download"}
-            </Button>
-            <Link href="/" className="text-sm text-mute hover:text-white">
-              Make another
+        {failed && (
+          <div className="mt-8 space-y-5">
+            <Alert>{job.data?.error ?? "Generation failed."} This still counts toward today's videos.</Alert>
+            <Link href="/" className={buttonClass("primary")}>
+              Try another prompt
             </Link>
-            <span className="ml-auto flex items-center gap-2 text-xs text-mute">
-              <span
-                aria-hidden
-                className={`size-1.5 rounded-full ${job.data.tier === "holder" ? "bg-monad" : "bg-mute"}`}
-              />
-              {job.data.tier === "holder" ? "Holder, no watermark" : "Free, watermarked"}
-            </span>
           </div>
-          {download.isError && <Alert>{download.error.message}</Alert>}
-        </Card>
-      )}
-    </div>
+        )}
+
+        {done && job.data && (
+          <div className="mt-8">
+            <div className="relative flex min-h-48 justify-center overflow-hidden rounded-3xl bg-ink">
+              <video
+                src={job.data.videoUrl}
+                controls
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="max-h-[70vh] w-auto max-w-full"
+              />
+              {job.data.watermark && (
+                <span className="pointer-events-none absolute right-4 top-4 text-sm font-semibold text-white/85 drop-shadow">
+                  Made with Dubu
+                </span>
+              )}
+            </div>
+
+            <div className="mt-6 grid gap-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+              <div>
+                <h2 className="text-sm font-medium text-mute">Prompt</h2>
+                <p className="mt-1 text-lg leading-relaxed">{job.data.prompt}</p>
+                <p className="mt-3 flex items-center gap-2 text-sm text-mute">
+                  <span aria-hidden className={`size-2 shrink-0 rounded-full ${job.data.tier === "holder" ? "bg-brand" : "bg-mute"}`} />
+                  {job.data.tier === "holder" ? "Holder mode. No watermark." : "Free mode. Download has a watermark."}
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 sm:w-56">
+                <Button size="lg" loading={download.isPending} onClick={() => download.mutate()}>
+                  {download.isPending ? (job.data.watermark ? "Adding watermark" : "Preparing download") : "Download video"}
+                </Button>
+                <Link href="/" className={buttonClass("ghost", "lg")}>
+                  Make another video
+                </Link>
+              </div>
+            </div>
+            {download.isError && (
+              <div className="mt-4">
+                <Alert>{download.error.message}</Alert>
+              </div>
+            )}
+          </div>
+        )}
+      </Container>
+    </main>
   );
 }

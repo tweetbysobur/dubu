@@ -47,18 +47,25 @@ export function ImageUpload({ value, onChange }: { value: string | null; onChang
           e.preventDefault();
           handle(e.dataTransfer.files[0]);
         }}
-        className="group relative grid aspect-square w-full max-w-60 place-items-center overflow-hidden rounded-xl border border-dashed border-line bg-ink text-sm text-mute hover:border-monad"
+        aria-label={value ? "Replace image" : "Add an image"}
+        className={`group relative grid aspect-[4/3] w-full place-items-center sm:aspect-square overflow-hidden rounded-2xl text-mute transition-colors ${
+          value ? "bg-surface" : "border-2 border-dashed border-line bg-surface hover:border-brand hover:bg-wash"
+        }`}
       >
         {busy ? (
-          <Spinner />
+          <Spinner className="text-brand" />
         ) : value ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={value} alt="Your upload" className="size-full object-cover" />
         ) : (
-          <span className="px-4 text-center">
-            Drop an image or <span className="text-monad-soft">browse</span>
-            <br />
-            <span className="text-xs">PNG, JPG, WebP</span>
+          <span className="flex flex-col items-center gap-3 px-6 text-center">
+            <svg aria-hidden width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#1F4FFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="4" />
+              <circle cx="9" cy="9" r="1.8" />
+              <path d="M21 15l-5-5L5 21" />
+            </svg>
+            <span className="text-base font-semibold text-ink">Add an image</span>
+            <span className="text-sm">Tap to choose, or drop a file here. PNG, JPG or WebP, up to 10 MB.</span>
           </span>
         )}
       </button>
@@ -70,11 +77,20 @@ export function ImageUpload({ value, onChange }: { value: string | null; onChang
         onChange={(e) => handle(e.target.files?.[0])}
       />
       {value && !busy && (
-        <button type="button" onClick={() => onChange(null)} className="mt-2 text-xs text-mute hover:text-white">
-          Remove image
-        </button>
+        <div className="mt-3 flex gap-4 text-sm font-medium">
+          <button type="button" onClick={() => input.current?.click()} className="text-brand hover:text-brand-press">
+            Replace image
+          </button>
+          <button type="button" onClick={() => onChange(null)} className="text-mute hover:text-ink">
+            Remove
+          </button>
+        </div>
       )}
-      {error && <p className="mt-2 text-xs text-bad">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
