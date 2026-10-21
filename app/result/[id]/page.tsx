@@ -63,7 +63,7 @@ export default function ResultPage() {
     <main>
       <Container className="max-w-3xl py-8 sm:py-12">
         <Link
-          href="/"
+          href="/studio"
           className="-ml-2 inline-flex h-11 items-center gap-1.5 rounded-xl px-2 text-[15px] font-medium text-mute hover:bg-surface hover:text-ink"
         >
           <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -88,11 +88,11 @@ export default function ResultPage() {
           <div className="mt-8 space-y-5">
             <Alert>{authError ? "Your sign-in expired. Sign in again to see this video." : job.error.message}</Alert>
             {authError ? (
-              <Link href="/" className={buttonClass("primary")}>
+              <Link href="/studio" className={buttonClass("primary")}>
                 Sign in again
               </Link>
             ) : goneError ? (
-              <Link href="/" className={buttonClass("primary")}>
+              <Link href="/studio" className={buttonClass("primary")}>
                 Make a new video
               </Link>
             ) : (
@@ -106,7 +106,7 @@ export default function ResultPage() {
         {failed && (
           <div className="mt-8 space-y-5">
             <Alert>{job.data?.error ?? "Generation failed."} This still counts toward today's videos.</Alert>
-            <Link href="/" className={buttonClass("primary")}>
+            <Link href="/studio" className={buttonClass("primary")}>
               Try another prompt
             </Link>
           </div>
@@ -144,7 +144,7 @@ export default function ResultPage() {
                 <Button size="lg" loading={download.isPending} onClick={() => download.mutate()}>
                   {download.isPending ? (job.data.watermark ? "Adding watermark" : "Preparing download") : "Download video"}
                 </Button>
-                <Link href="/" className={buttonClass("ghost", "lg")}>
+                <Link href="/studio" className={buttonClass("ghost", "lg")}>
                   Make another video
                 </Link>
               </div>

@@ -174,17 +174,18 @@ export function Header() {
   const me = useMe();
   const heroCtaOffscreen = useHeroCtaOffscreen();
   const signedIn = !!me.data;
-  const landing = pathname === "/" && me.data === null;
+  const landing = pathname === "/";
 
   const links: NavLink[] = landing
     ? [
         { href: "#how-it-works", label: "How it works" },
         { href: "#holders", label: "Holder mode" },
         { href: "#faq", label: "FAQ" },
+        ...(signedIn ? [{ href: "/studio", label: "Studio" }] : []),
       ]
     : signedIn
       ? [
-          { href: "/", label: "Studio" },
+          { href: "/studio", label: "Studio" },
           { href: "/profile", label: "Profile" },
           { href: "/faq", label: "FAQ" },
         ]

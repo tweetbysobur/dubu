@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { api, formatChog, type TierFacts } from "@/lib/api";
 import { useHeroCtaRef } from "@/lib/heroCta";
@@ -8,7 +9,7 @@ import { Mascot, type Mood } from "./Mascot";
 import { Faq } from "./Faq";
 import { ChogReel } from "./ChogReel";
 import { SignIn } from "./SignIn";
-import { Container } from "./ui";
+import { buttonClass, Container } from "./ui";
 
 export function Landing({ session }: { session: ReturnType<typeof useSession> }) {
   const tiers = useQuery<TierFacts>({ queryKey: ["tiers"], queryFn: () => api<TierFacts>("/api/tiers") });
@@ -62,7 +63,18 @@ function Hero({ session }: { session: ReturnType<typeof useSession> }) {
             holders get their own Chog loaded in, sharper video and no watermark.
           </p>
           <div ref={ctaRef} id="sign-in" className="mt-8 scroll-mt-24">
-            <SignIn session={session} />
+            {session.state === "ready" && session.me ? (
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Link href="/studio" className={`${buttonClass("primary", "lg")} w-full sm:w-auto`}>
+                  Open the studio
+                </Link>
+                <Link href="/profile" className={`${buttonClass("ghost", "lg")} w-full sm:w-auto`}>
+                  Profile
+                </Link>
+              </div>
+            ) : (
+              <SignIn session={session} />
+            )}
           </div>
         </Viewfinder>
       </Container>
