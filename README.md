@@ -31,10 +31,21 @@ Video provider: deAPI when `DEAPI_API_KEY` is set (free $5 credit at signup, no 
 | `HOLDER_DAILY_LIMIT` / `FREE_DAILY_LIMIT` | Generations per wallet per UTC day. Defaults 50 and 3 |
 | `DEMO_HOLDER_ADDRESSES` / `DEMO_CHOG_IMAGE_URL` | Treat listed wallets as holders for a demo |
 
+## Sign-in
+
+Two ways, both end in the same signed server session:
+
+- **Passkey (default).** [Mera](https://github.com/category-labs/mera) (`@category-labs/mera`, pinned to 0.3.0) turns a passkey's PRF output into a standard EVM account (BIP-39 entropy, path `m/44'/60'/0'/0/0`, same as MetaMask). Face ID or a fingerprint creates the wallet on first use and reopens it after. The key exists only in the tab, only long enough to sign the login message, then it is wiped. No backend, no API key, no custody, no transactions.
+- **External wallet.** RainbowKit, for Chog holders whose Chog lives in an existing wallet. Connecting prompts the sign-in signature straight away.
+
+Passkeys are bound to the site's hostname (`dubuai.vercel.app`). Moving to another domain means passkeys from the old one stop working there, so plan any domain move before users store anything in a passkey wallet.
+
+Mera 0.3 declares an optional peer on `@wagmi/core` v3 for its wagmi connector, which Dubu does not use. An npm `overrides` entry pins that peer to the project's wagmi v2 so the install resolves.
+
 ## How it works
 
-1. Wallet connects with RainbowKit on Monad.
-2. The user signs a nonce message. `/api/auth/verify` checks it with viem (EOAs and EIP-1271 smart wallets) and sets an httpOnly session cookie.
+1. The user signs in with a passkey, or connects a wallet with RainbowKit on Monad.
+2. The account signs a nonce message. `/api/auth/verify` checks it with viem (EOAs and EIP-1271 smart wallets) and sets an httpOnly session cookie.
 3. `/api/me` reads `balanceOf` on the Chog contract for the signed-in wallet, then lists its tokens (ERC721Enumerable, then Alchemy) and loads metadata, image and traits. If neither can list them, the holder enters a token ID and `/api/token/:id` accepts it only when `ownerOf` matches the wallet.
 4. `/api/generate` re-checks ownership on every call. The client never decides the tier. Holders can only pick a token they own. Traits are appended to the prompt.
 5. The server calls Replicate. The browser polls `/api/jobs/:id` and plays the video from `/api/jobs/:id/video`, which streams through the backend. The browser never talks to the provider.
@@ -43,6 +54,7 @@ Video provider: deAPI when `DEAPI_API_KEY` is set (free $5 credit at signup, no 
 ## Limits
 
 - Daily quota per wallet, by tier.
+- Daily cap on free videos per network (`FREE_IP_DAILY_LIMIT`, default 6), because passkey wallets cost nothing to create.
 - Burst limit: 3 valid generations per wallet per minute, 6 per IP.
 - Sign-in endpoints are rate limited per IP.
 

@@ -2,7 +2,16 @@ import { NextResponse } from "next/server";
 import { getSessionAddress } from "@/lib/session";
 import { getHolderStatus, getOwnedToken, type ChogToken } from "@/lib/chog";
 import { dailyLimit, type Tier } from "@/lib/tiers";
-import { allowBurst, clientIp, getUsed, refundUse, reserveUse } from "@/lib/limits";
+import {
+  allowBurst,
+  clientIp,
+  freeIpDailyLimit,
+  getUsed,
+  refundFreeIp,
+  refundUse,
+  reserveFreeIp,
+  reserveUse,
+} from "@/lib/limits";
 import { createVideo } from "@/lib/video";
 import { encodeJob } from "@/lib/jobs";
 import { fail, readJson } from "@/lib/http";
@@ -85,15 +94,21 @@ export async function POST(req: Request) {
   }
 
   // Limits apply to valid requests only, right before we spend provider credits. Fail closed.
+  const ip = clientIp(req);
   let used: number;
   try {
     const burstOk =
-      (await allowBurst(`gen:${address}`, 3, 60_000)) && (await allowBurst(`gen-ip:${clientIp(req)}`, 6, 60_000));
+      (await allowBurst(`gen:${address}`, 3, 60_000)) && (await allowBurst(`gen-ip:${ip}`, 6, 60_000));
     if (!burstOk) return fail(429, "Slow down. Max 3 generations per minute.");
 
     const quota = await reserveUse(address, limit);
     if (!quota.ok) return fail(403, limitMessage, { used: limit, limit });
     used = quota.used;
+
+    if (tier === "free" && !(await reserveFreeIp(ip, freeIpDailyLimit()))) {
+      await refundUse(address);
+      return fail(429, "Free videos from this network are used up for today. Hold a Chog for holder mode.");
+    }
   } catch (e) {
     console.error("[generate] store error", e);
     return fail(503, "Usage service is unavailable. Try again shortly.");
@@ -105,6 +120,7 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error("[generate] provider error", e);
     await refundUse(address).catch(() => {});
+    if (tier === "free") await refundFreeIp(ip).catch(() => {});
     return fail(502, "The video service rejected the request. Try a different image or prompt.");
   }
 

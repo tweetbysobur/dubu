@@ -1,18 +1,19 @@
 "use client";
 
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useQuery } from "@tanstack/react-query";
 import { api, type TierFacts } from "@/lib/api";
 import { useHeroCtaRef } from "@/lib/heroCta";
+import type { useSession } from "@/lib/useSession";
 import { Mascot, type Mood } from "./Mascot";
 import { Logo } from "./Logo";
-import { buttonClass, Container } from "./ui";
+import { SignIn } from "./SignIn";
+import { Container } from "./ui";
 
-export function Landing() {
+export function Landing({ session }: { session: ReturnType<typeof useSession> }) {
   const tiers = useQuery<TierFacts>({ queryKey: ["tiers"], queryFn: () => api<TierFacts>("/api/tiers") });
   return (
     <main>
-      <Hero />
+      <Hero session={session} />
       <HowItWorks clipSeconds={tiers.data?.clipSeconds ?? null} />
       <Compare tiers={tiers.data} />
       <Footer />
@@ -34,7 +35,7 @@ function Viewfinder({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Hero() {
+function Hero({ session }: { session: ReturnType<typeof useSession> }) {
   const ctaRef = useHeroCtaRef<HTMLDivElement>();
   return (
     <section className="border-b border-line">
@@ -54,20 +55,8 @@ function Hero() {
             Upload an image and describe a scene. Dubu turns it into a short video you can download. Chog Genesis
             holders get their own Chog loaded in, sharper video and no watermark.
           </p>
-          <div ref={ctaRef} className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
-            <ConnectButton.Custom>
-              {({ openConnectModal, mounted }) => (
-                <button
-                  type="button"
-                  onClick={openConnectModal}
-                  disabled={!mounted}
-                  className={buttonClass("primary", "lg")}
-                >
-                  Connect wallet to start
-                </button>
-              )}
-            </ConnectButton.Custom>
-            <p className="text-sm text-mute">Signing in is a free message. No transaction.</p>
+          <div ref={ctaRef} id="sign-in" className="mt-8 scroll-mt-24">
+            <SignIn session={session} />
           </div>
         </Viewfinder>
       </Container>
@@ -79,8 +68,8 @@ function HowItWorks({ clipSeconds }: { clipSeconds: number | null }) {
   const steps: { mood: Mood; title: string; body: string }[] = [
     {
       mood: "idle",
-      title: "Connect your wallet",
-      body: "Dubu checks your wallet for a Chog Genesis NFT. If you hold one, your Chog loads in by itself.",
+      title: "Sign in",
+      body: "Use a passkey for a free Dubu wallet, or connect the wallet that holds your Chog. Holders get their Chog loaded in.",
     },
     {
       mood: "rolling",

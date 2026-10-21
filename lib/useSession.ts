@@ -1,20 +1,20 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useAccount, useSignMessage } from "wagmi";
+import { useAccount, useDisconnect, useSignMessage } from "wagmi";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, type Me } from "./api";
+import { createPasskeyWallet, forgetPasskey, openPasskeyWallet, passkeyErrorMessage } from "./passkey";
 
-/**
- * Wallet session state:
- * disconnected -> needs-signature -> checking -> ready | error
- */
-export function useSession() {
-  const { address, isConnected, status: accountStatus } = useAccount();
-  const { signMessageAsync } = useSignMessage();
-  const qc = useQueryClient();
+async function signInWith(address: string, sign: (message: string) => Promise<string>) {
+  const { message } = await api<{ message: string }>(`/api/auth/nonce?address=${address}`);
+  const signature = await sign(message);
+  await api("/api/auth/verify", { method: "POST", body: JSON.stringify({ address, signature }) });
+}
 
-  const me = useQuery<Me | null>({
+/** Read-only session for places like the header. Shares the cache with useSession. */
+export function useMe() {
+  return useQuery<Me | null>({
     queryKey: ["me"],
     queryFn: async () => {
       try {
@@ -24,49 +24,109 @@ export function useSession() {
         throw e;
       }
     },
-    enabled: isConnected,
     retry: false,
     staleTime: 30_000,
   });
+}
 
-  // Signed session belongs to a different wallet than the connected one: drop it.
-  const mismatch = !!(me.data && address && me.data.address !== address.toLowerCase());
-  const lastAddress = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (lastAddress.current && lastAddress.current !== address) {
-      api("/api/auth/logout", { method: "POST" }).finally(() => qc.setQueryData(["me"], null));
-    }
-    lastAddress.current = address;
-  }, [address, qc]);
-
-  const signIn = useMutation({
+/** Ends the server session and disconnects any external wallet. */
+export function useSignOut() {
+  const qc = useQueryClient();
+  const { isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  return useMutation({
     mutationFn: async () => {
-      if (!address) throw new Error("Connect a wallet first.");
-      const { message } = await api<{ message: string }>(`/api/auth/nonce?address=${address}`);
-      let signature: string;
-      try {
-        signature = await signMessageAsync({ message });
-      } catch {
-        throw new Error("Signature cancelled. Sign the message to continue.");
-      }
-      await api("/api/auth/verify", { method: "POST", body: JSON.stringify({ address, signature }) });
+      await api("/api/auth/logout", { method: "POST" }).catch(() => {});
+      if (isConnected) disconnect();
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
+    onSettled: () => qc.setQueryData(["me"], null),
+  });
+}
+
+/**
+ * Full session for the page. Use once per screen: it auto-prompts a connected
+ * wallet to sign, which must not happen twice.
+ *
+ * The server session is the source of truth. Two ways to get one:
+ *  - passkey: Mera derives a wallet in the browser and signs the login message
+ *  - wallet: an external wallet (for Chog holders) signs the same message
+ *
+ * States: loading -> signed-out | wallet-signing | ready | error
+ */
+export function useSession() {
+  const qc = useQueryClient();
+  const { address: walletAddress, isConnected, status: walletStatus } = useAccount();
+  const { signMessageAsync } = useSignMessage();
+  const me = useMe();
+  const signOut = useSignOut();
+
+  const done = () => qc.invalidateQueries({ queryKey: ["me"] });
+
+  const passkey = useMutation({
+    mutationFn: async (mode: "create" | "open" | "open-any") => {
+      let wallet;
+      try {
+        wallet = mode === "create" ? await createPasskeyWallet() : await openPasskeyWallet(mode === "open-any");
+      } catch (e) {
+        throw new Error(passkeyErrorMessage(e));
+      }
+      try {
+        await signInWith(wallet.account.address, (message) => wallet.account.signMessage({ message }));
+      } finally {
+        wallet.end(); // the key is only needed for this one signature
+      }
+    },
+    onSuccess: done,
   });
 
-  let state: "connecting" | "disconnected" | "needs-signature" | "checking" | "ready" | "error";
-  if (accountStatus === "connecting" || accountStatus === "reconnecting") state = "connecting";
-  else if (!isConnected) state = "disconnected";
-  else if (me.isPending) state = "checking";
+  const walletSignIn = useMutation({
+    mutationFn: async () => {
+      if (!walletAddress) throw new Error("Connect a wallet first.");
+      await signInWith(walletAddress, async (message) => {
+        try {
+          return await signMessageAsync({ message });
+        } catch {
+          throw new Error("The signature was cancelled. Sign the message in your wallet to continue.");
+        }
+      });
+    },
+    onSuccess: done,
+  });
+
+  // A wallet connected with no session yet: ask it to sign right away, once per address.
+  const autoTried = useRef<string | null>(null);
+  const needsWalletSig = isConnected && !!walletAddress && me.data === null;
+  useEffect(() => {
+    if (!needsWalletSig || walletSignIn.isPending || autoTried.current === walletAddress) return;
+    autoTried.current = walletAddress!;
+    walletSignIn.mutate();
+  }, [needsWalletSig, walletAddress, walletSignIn]);
+
+  // The connected wallet switched accounts: the old session no longer matches it.
+  const lastWallet = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (lastWallet.current && walletAddress && lastWallet.current !== walletAddress) {
+      autoTried.current = null;
+      api("/api/auth/logout", { method: "POST" }).finally(() => qc.setQueryData(["me"], null));
+    }
+    lastWallet.current = walletAddress;
+  }, [walletAddress, qc]);
+
+  let state: "loading" | "signed-out" | "wallet-signing" | "ready" | "error";
+  if (me.isPending || walletStatus === "reconnecting") state = "loading";
   else if (me.isError) state = "error";
-  else if (!me.data || mismatch) state = "needs-signature";
-  else state = "ready";
+  else if (me.data) state = "ready";
+  else if (needsWalletSig) state = "wallet-signing";
+  else state = "signed-out";
 
   return {
     state,
     me: state === "ready" ? me.data! : null,
     meError: me.error as Error | null,
     refetch: me.refetch,
-    signIn,
+    passkey,
+    walletSignIn,
+    signOut,
+    forgetPasskey,
   };
 }

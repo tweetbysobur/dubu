@@ -30,6 +30,33 @@ export function refundUse(address: string) {
   return decr(dayKey(address));
 }
 
+function ipDayKey(ip: string) {
+  return `dubu:free-ip:${ip}:${new Date().toISOString().slice(0, 10)}`;
+}
+
+/**
+ * Daily cap on free videos per network. Passkey wallets cost nothing to create,
+ * so the per-wallet quota alone would not protect the video credit.
+ */
+export async function reserveFreeIp(ip: string, limit: number): Promise<boolean> {
+  const key = ipDayKey(ip);
+  const n = await incr(key, DAY_TTL_S);
+  if (n > limit) {
+    await decr(key);
+    return false;
+  }
+  return true;
+}
+
+export function refundFreeIp(ip: string) {
+  return decr(ipDayKey(ip));
+}
+
+export function freeIpDailyLimit() {
+  const n = Number(process.env.FREE_IP_DAILY_LIMIT ?? 6);
+  return Number.isFinite(n) && n > 0 ? n : 6;
+}
+
 /** Fixed-window limiter. Returns true when the call is allowed. */
 export async function allowBurst(key: string, max: number, windowMs: number) {
   const bucket = Math.floor(Date.now() / windowMs);
