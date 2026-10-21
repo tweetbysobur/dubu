@@ -1,6 +1,6 @@
 import { getSessionAddress } from "@/lib/session";
 import { decodeJob } from "@/lib/jobs";
-import { getVideo } from "@/lib/video";
+import { getVideo, videoFetchHeaders } from "@/lib/video";
 import { fail } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -23,8 +23,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (v.status !== "succeeded" || !v.url) return fail(409, "Video is not ready yet.");
 
   const range = req.headers.get("range");
-  const upstream = await fetch(v.url, { headers: range ? { range } : {} });
-  if (!upstream.ok && upstream.status !== 206) return fail(502, "Could not load the video file.");
+  let upstream: Response;
+  try {
+    upstream = await fetch(v.url, {
+      headers: { ...videoFetchHeaders(job.id, v.url), ...(range ? { range } : {}) },
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch {
+    return fail(502, "Could not load the video file.");
+  }
+  if (!upstream.ok && upstream.status !== 206) {
+    console.error("[video] upstream", upstream.status);
+    return fail(502, "Could not load the video file.");
+  }
 
   const headers = new Headers();
   for (const h of ["content-type", "content-length", "content-range", "accept-ranges"]) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { persistent, ping } from "@/lib/store";
-import { MOCK } from "@/lib/video";
+import { PROVIDER } from "@/lib/video";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,7 @@ export async function GET() {
     {
       store: persistent ? "redis" : "memory",
       storeOk,
-      video: MOCK ? "demo" : "replicate",
+      video: PROVIDER,
       chogContract: Boolean(process.env.CHOG_CONTRACT_ADDRESS),
       sessionSecret: (process.env.SESSION_SECRET?.length ?? 0) >= 32,
     },

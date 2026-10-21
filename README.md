@@ -12,7 +12,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-With no `REPLICATE_API_TOKEN`, Dubu runs in demo mode and returns a sample clip after about 8 seconds. The UI says so.
+Video provider: deAPI when `DEAPI_API_KEY` is set (free $5 credit at signup, no card), else Replicate when `REPLICATE_API_TOKEN` is set, else demo mode, which returns a sample clip after about 8 seconds. The UI says when it is in demo mode. `/api/health` shows which provider is active.
 
 ## Config
 
@@ -23,7 +23,9 @@ With no `REPLICATE_API_TOKEN`, Dubu runs in demo mode and returns a sample clip 
 | `NEXT_PUBLIC_WC_PROJECT_ID` | WalletConnect project ID. Injected wallets work without it |
 | `CHOG_CONTRACT_ADDRESS` | Chog Genesis ERC-721, `0xc96d31f8626c6d03fae5dcd3d61e3fb9f4a73763` on mainnet. Without it, every wallet is free tier |
 | `ALCHEMY_API_KEY` | Lists token IDs when the contract is not ERC721Enumerable |
-| `REPLICATE_API_TOKEN` | Video provider key. Server only |
+| `DEAPI_API_KEY` | deAPI key (free credits). Takes priority over Replicate. Server only |
+| `DEAPI_MODEL` / `DEAPI_SIZE_*` / `DEAPI_FRAMES` / `DEAPI_FPS` / `DEAPI_STEPS` | deAPI model and output settings. Defaults: LTX-Video 13B distilled, 512 free / 768 holder, 120 frames at 30 fps |
+| `REPLICATE_API_TOKEN` | Replicate key (paid). Server only |
 | `REPLICATE_MODEL` | Image-to-video model. Default `wan-video/wan-2.2-i2v-fast` |
 | `REPLICATE_INPUT_HOLDER` / `_FREE` | Extra model inputs per tier, as JSON |
 | `HOLDER_DAILY_LIMIT` / `FREE_DAILY_LIMIT` | Generations per wallet per UTC day. Defaults 50 and 3 |
