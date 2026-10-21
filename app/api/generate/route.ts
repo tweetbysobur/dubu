@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { getSessionAddress } from "@/lib/session";
 import { getHolderStatus, getOwnedToken, type ChogToken } from "@/lib/chog";
 import { dailyLimit, type Tier } from "@/lib/tiers";
-import { addUse, allowBurst, clientIp, getUsed } from "@/lib/limits";
+import { allowBurst, clientIp, getUsed, refundUse, reserveUse } from "@/lib/limits";
 import { createVideo } from "@/lib/video";
-import { saveJob } from "@/lib/jobs";
+import { encodeJob } from "@/lib/jobs";
 import { fail, readJson } from "@/lib/http";
 
 const MAX_IMAGE_CHARS = 2_000_000; // ~1.5 MB after base64
@@ -49,12 +49,15 @@ export async function POST(req: Request) {
   const tier: Tier = status.holder ? "holder" : "free";
 
   const limit = dailyLimit(tier);
-  const used = getUsed(address);
-  if (used >= limit) {
-    return fail(403, tier === "free" ? "Daily free limit reached. Hold a Chog to unlock more." : "Daily limit reached.", {
-      used,
-      limit,
-    });
+  const limitMessage =
+    tier === "free" ? "Daily free limit reached. Hold a Chog to unlock more." : "Daily limit reached. Come back tomorrow.";
+
+  // Cheap early exit. The atomic check happens in reserveUse below.
+  try {
+    if ((await getUsed(address)) >= limit) return fail(403, limitMessage, { used: limit, limit });
+  } catch (e) {
+    console.error("[generate] store error", e);
+    return fail(503, "Usage service is unavailable. Try again shortly.");
   }
 
   let image: string;
@@ -81,18 +84,30 @@ export async function POST(req: Request) {
     image = body.image;
   }
 
-  // Burst limit applies to valid requests only, right before we spend provider credits
-  if (!allowBurst(`gen:${address}`, 3, 60_000) || !allowBurst(`gen-ip:${clientIp(req)}`, 6, 60_000)) {
-    return fail(429, "Slow down. Max 3 generations per minute.");
+  // Limits apply to valid requests only, right before we spend provider credits. Fail closed.
+  let used: number;
+  try {
+    const burstOk =
+      (await allowBurst(`gen:${address}`, 3, 60_000)) && (await allowBurst(`gen-ip:${clientIp(req)}`, 6, 60_000));
+    if (!burstOk) return fail(429, "Slow down. Max 3 generations per minute.");
+
+    const quota = await reserveUse(address, limit);
+    if (!quota.ok) return fail(403, limitMessage, { used: limit, limit });
+    used = quota.used;
+  } catch (e) {
+    console.error("[generate] store error", e);
+    return fail(503, "Usage service is unavailable. Try again shortly.");
   }
 
+  let providerId: string;
   try {
-    const id = await createVideo({ tier, image, prompt: finalPrompt });
-    saveJob({ id, address, tier, prompt, createdAt: Date.now() });
-    addUse(address);
-    return NextResponse.json({ id, tier, used: used + 1, limit });
+    providerId = await createVideo({ tier, image, prompt: finalPrompt });
   } catch (e) {
     console.error("[generate] provider error", e);
+    await refundUse(address).catch(() => {});
     return fail(502, "The video service rejected the request. Try a different image or prompt.");
   }
+
+  const id = encodeJob({ id: providerId, address, tier, prompt, createdAt: Date.now() });
+  return NextResponse.json({ id, tier, used, limit });
 }

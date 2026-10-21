@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionAddress } from "@/lib/session";
-import { getJob } from "@/lib/jobs";
+import { decodeJob } from "@/lib/jobs";
 import { getVideo } from "@/lib/video";
 import { TIER_INFO } from "@/lib/tiers";
 import { fail } from "@/lib/http";
@@ -12,12 +12,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const address = await getSessionAddress();
   if (!address) return fail(401, "Sign in with your wallet first.");
 
-  const job = getJob(id);
+  const job = decodeJob(id);
   if (!job) return fail(404, "Video not found. It may have expired.");
-  if (job.address !== address) return fail(403, "This video belongs to another wallet.");
+  if (job.address !== address.toLowerCase()) return fail(403, "This video belongs to another wallet.");
 
   try {
-    const v = await getVideo(id);
+    const v = await getVideo(job.id);
     return NextResponse.json({
       id,
       status: v.status,

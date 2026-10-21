@@ -4,10 +4,10 @@ import { isAddress, isHex, type Address } from "viem";
 import { client } from "@/lib/chog";
 import { cookieBase, createSessionToken, NONCE_COOKIE, SESSION_COOKIE, signInMessage } from "@/lib/session";
 import { fail, readJson } from "@/lib/http";
-import { allowBurst, clientIp } from "@/lib/limits";
+import { clientIp, softBurst } from "@/lib/limits";
 
 export async function POST(req: Request) {
-  if (!allowBurst(`verify:${clientIp(req)}`, 10, 60_000)) return fail(429, "Too many attempts. Wait a minute.");
+  if (!(await softBurst(`verify:${clientIp(req)}`, 10, 60_000))) return fail(429, "Too many attempts. Wait a minute.");
 
   const body = await readJson<{ address?: string; signature?: string }>(req);
   if (!body?.address || !isAddress(body.address)) return fail(400, "Invalid wallet address.");

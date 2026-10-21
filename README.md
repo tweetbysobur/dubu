@@ -44,7 +44,11 @@ With no `REPLICATE_API_TOKEN`, Dubu runs in demo mode and returns a sample clip 
 - Burst limit: 3 valid generations per wallet per minute, 6 per IP.
 - Sign-in endpoints are rate limited per IP.
 
-Counters live in memory. That holds for one server. Move them to Redis or Upstash before running more than one instance.
+Counters live in Upstash Redis when `KV_REST_API_URL` and `KV_REST_API_TOKEN` are set (Vercel Marketplace, Upstash integration, sets both). Without them, counters fall back to process memory, which is fine locally but does not hold on Vercel, where each request can hit a different instance.
+
+Generation fails closed if Redis is unreachable. Sign-in rate limits fail open, so an outage does not lock users out.
+
+Jobs need no storage. The job ID is a signed token (HMAC with `SESSION_SECRET`) carrying the provider ID, wallet, tier and prompt, so any instance can serve it. Tokens expire after 24 hours.
 
 ## Checks
 
@@ -54,6 +58,8 @@ npm run build
 SESSION_SECRET=$(openssl rand -hex 32) npm start
 npm run smoke   # in another terminal, demo mode
 ```
+
+`scripts/cross-instance.mjs` runs against two servers sharing one Redis and checks that jobs and quotas work across instances.
 
 ## Out of scope
 

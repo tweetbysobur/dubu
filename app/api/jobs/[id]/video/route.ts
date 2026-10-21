@@ -1,5 +1,5 @@
 import { getSessionAddress } from "@/lib/session";
-import { getJob } from "@/lib/jobs";
+import { decodeJob } from "@/lib/jobs";
 import { getVideo } from "@/lib/video";
 import { fail } from "@/lib/http";
 
@@ -11,10 +11,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const address = await getSessionAddress();
   if (!address) return fail(401, "Sign in with your wallet first.");
 
-  const job = getJob(id);
-  if (!job || job.address !== address) return fail(404, "Video not found.");
+  const job = decodeJob(id);
+  if (!job || job.address !== address.toLowerCase()) return fail(404, "Video not found.");
 
-  const v = await getVideo(id);
+  let v;
+  try {
+    v = await getVideo(job.id);
+  } catch {
+    return fail(502, "Could not reach the video service.");
+  }
   if (v.status !== "succeeded" || !v.url) return fail(409, "Video is not ready yet.");
 
   const range = req.headers.get("range");

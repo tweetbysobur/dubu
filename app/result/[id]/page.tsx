@@ -50,6 +50,10 @@ export default function ResultPage() {
             <Link href="/" className="text-sm text-monad-soft">
               Sign in again
             </Link>
+          ) : job.error instanceof ApiError && [403, 404].includes(job.error.status) ? (
+            <Link href="/" className="text-sm text-monad-soft">
+              Make a new video
+            </Link>
           ) : (
             <Button variant="ghost" onClick={() => job.refetch()}>
               Retry

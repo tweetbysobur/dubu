@@ -61,6 +61,12 @@ expect("valid generate after invalid ones", first.status, 200);
 const job = await call(`/api/jobs/${first.data.id}`);
 expect("job readable by owner", job.status, 200);
 expect("job hides provider URL", String(job.data.videoUrl ?? "/api/").startsWith("/api/"), true);
+const [payload, mac] = String(first.data.id).split(".");
+const forged = Buffer.from(
+  JSON.stringify({ ...JSON.parse(Buffer.from(payload, "base64url").toString()), a: "0x0000000000000000000000000000000000000001" }),
+).toString("base64url");
+expect("tampered job token rejected", (await call(`/api/jobs/${forged}.${mac}`)).status, 404);
+expect("garbage job id rejected", (await call("/api/jobs/not-a-real-job")).status, 404);
 expect("job unreadable without session", (await call(`/api/jobs/${first.data.id}`, null, { noCookie: true })).status, 401);
 
 expect("second generate", (await call("/api/generate", { prompt: "chog two", image: PNG })).status, 200);

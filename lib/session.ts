@@ -17,6 +17,15 @@ function sign(value: string) {
   return createHmac("sha256", secret()).update(value).digest("base64url");
 }
 
+/** HMAC with the session secret. Used for any server-issued token. */
+export const hmac = sign;
+
+export function safeEqual(a: string, b: string) {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
 export function newNonce() {
   return randomBytes(16).toString("hex");
 }

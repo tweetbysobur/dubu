@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionAddress } from "@/lib/session";
 import { getOwnedToken, TOKEN_ID } from "@/lib/chog";
-import { allowBurst } from "@/lib/limits";
+import { softBurst } from "@/lib/limits";
 import { fail } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const address = await getSessionAddress();
   if (!address) return fail(401, "Sign in with your wallet first.");
   if (!TOKEN_ID.test(id)) return fail(400, "Token ID must be a number.");
-  if (!allowBurst(`token:${address}`, 20, 60_000)) return fail(429, "Too many lookups. Wait a minute.");
+  if (!(await softBurst(`token:${address}`, 20, 60_000))) return fail(429, "Too many lookups. Wait a minute.");
 
   try {
     const token = await getOwnedToken(address, id);

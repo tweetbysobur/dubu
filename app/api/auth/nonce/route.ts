@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { isAddress } from "viem";
 import { cookieBase, newNonce, NONCE_COOKIE, signInMessage } from "@/lib/session";
 import { fail } from "@/lib/http";
-import { allowBurst, clientIp } from "@/lib/limits";
+import { clientIp, softBurst } from "@/lib/limits";
 
 export async function GET(req: Request) {
-  if (!allowBurst(`nonce:${clientIp(req)}`, 20, 60_000)) return fail(429, "Too many requests. Wait a minute.");
+  if (!(await softBurst(`nonce:${clientIp(req)}`, 20, 60_000))) return fail(429, "Too many requests. Wait a minute.");
 
   const address = new URL(req.url).searchParams.get("address") ?? "";
   if (!isAddress(address)) return fail(400, "Invalid wallet address.");
