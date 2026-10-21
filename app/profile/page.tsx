@@ -10,6 +10,7 @@ import { useMe } from "@/lib/useSession";
 import { rememberedPasskey } from "@/lib/passkey";
 import { Alert, Button, Container, Panel, Spinner, buttonClass } from "@/components/ui";
 import { Mascot } from "@/components/Mascot";
+import { ExportWallet } from "@/components/ExportWallet";
 
 const MAX_LINKED = 3;
 
@@ -135,6 +136,8 @@ function Profile({ me }: { me: NonNullable<ReturnType<typeof useMe>["data"]> }) 
         </Panel>
 
         <LinkedWallets linked={linked} account={me.address} tracked={me.chog.tracked} />
+
+        {isPasskey && <ExportWallet address={me.address} />}
       </Container>
     </main>
   );

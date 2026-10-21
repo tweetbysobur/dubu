@@ -5,45 +5,57 @@ import { api, formatChog, type TierFacts } from "@/lib/api";
 
 function items(t?: TierFacts): { q: string; a: string }[] {
   const free = t ? String(t.free.limit) : "a few";
+  const tokenOn = !!t?.chogMin;
   const length = t?.clipSeconds ? `About ${t.clipSeconds} seconds.` : "A few seconds.";
-  const sizes = t ? ` Holder videos are ${t.holder.quality}. Free videos are ${t.free.quality}.` : "";
+  const sizes = t
+    ? ` ${tokenOn ? "Genesis and CHOG holder" : "Genesis holder"} videos are ${t.holder.quality}. Free videos are ${t.free.quality}.`
+    : "";
+
   return [
     {
       q: "What is Dubu?",
-      a: "Dubu turns one image and one sentence into a short video. Chog Genesis holders get their own Chog loaded in, sharper video and no watermark.",
+      a: "Dubu turns one image and one sentence into a short video. It is built for the Chog community on Monad: the more Chog you hold, the more you get.",
     },
     {
       q: "Do I need a Chog?",
-      a: `No. Anyone can make ${free} videos a day for free by uploading an image. Holding a Chog Genesis NFT${t?.chogMin ? " or CHOG" : ""} on Monad unlocks more.`,
+      a: `No. Anyone can make ${free} videos a day for free by uploading an image. Holding a Chog Genesis NFT${tokenOn ? " or enough CHOG" : ""} unlocks more.`,
     },
-    ...(t?.chogMin
+    ...(t && tokenOn
       ? [
           {
             q: "What is the difference between a Genesis holder and a CHOG holder?",
-            a: `A Chog Genesis NFT makes you a Genesis holder: your Chog loads into the studio, its traits shape the prompt, and you get ${t.holder.limit} videos a day. Holding at least ${formatChog(t.chogMin)} CHOG makes you a CHOG holder: ${t.token.quality} video, no watermark and ${t.token.limit} videos a day, with an image you upload.`,
+            a: `A Chog Genesis NFT makes you a Genesis holder: your own Chog loads into the studio, its traits shape the prompt, and you get ${t.holder.limit} videos a day with no watermark. Holding at least ${formatChog(t.chogMin)} CHOG makes you a CHOG holder: ${t.token.quality} video, no watermark and ${t.token.limit} videos a day, with an image you upload. If you have both, you are a Genesis holder.`,
           },
         ]
       : []),
     {
-      q: "What is a passkey wallet?",
-      a: "When you continue with a passkey, your phone or computer creates one with Face ID, a fingerprint or your screen lock. Dubu turns it into a wallet address on your device. Dubu never sees the key, and there is no seed phrase to write down.",
+      q: "How does Dubu check what I hold?",
+      a: `Dubu reads the Chog Genesis contract${tokenOn ? " and your CHOG balance" : ""} on Monad for your sign-in wallet and every wallet you link. It checks again each time you make a video, so moving a Chog out of your wallets changes your level right away.`,
     },
     {
       q: "My Chog is in another wallet. How do I get credit for it?",
-      a: "Open Profile and link that wallet. You sign one message with it to prove it is yours. Dubu adds up what all your linked wallets hold. You can also sign in with that wallet directly.",
+      a: `Open Profile and link that wallet. You sign one message with it to prove it is yours. Dubu adds up${tokenOn ? " the NFTs and CHOG in" : " what"} all your linked wallets${tokenOn ? "" : " hold"}. You can link up to 3 wallets, and each wallet can belong to one Dubu account at a time.`,
+    },
+    {
+      q: "What is a passkey wallet?",
+      a: "When you continue with a passkey, your phone or computer creates one with Face ID, a fingerprint or your screen lock. Dubu turns it into a wallet on your device. Dubu never sees its key, and you do not need to write anything down to start.",
+    },
+    {
+      q: "Can I move my passkey wallet to MetaMask or another wallet?",
+      a: "Yes. In Profile, Export wallet shows your 24-word recovery phrase after a passkey check. Import it into MetaMask, Rabby or any wallet that accepts a recovery phrase and the same address appears. The phrase stays on your device. Dubu never sees or stores it.",
+    },
+    {
+      q: "What if I lose my passkey?",
+      a: "Passkeys sync through your Apple or Google account, so a new phone signed in to the same account still has it. If a passkey is deleted and you never exported the recovery phrase, Dubu cannot recover that wallet. Export the phrase from Profile and keep it offline. Better still, keep your Chog in your own wallet and link it.",
     },
     {
       q: "Does Dubu cost gas or ask me to approve transactions?",
       a: "No. Dubu only asks you to sign messages, to sign in or to link a wallet. Signing a message moves no funds and costs no gas.",
     },
-    {
-      q: "What if I lose my passkey?",
-      a: "Passkeys sync through your Apple or Google account, so a new phone signed in to the same account still has it. If a passkey is deleted, Dubu cannot recover that wallet. Keep your Chog in your own wallet and link it, rather than sending it to the passkey wallet.",
-    },
     { q: "How long are the videos?", a: `${length}${sizes}` },
     {
       q: "Why does my video have a watermark?",
-      a: "Free videos carry a small Made with Dubu mark. Holder videos do not.",
+      a: `Free videos carry a small Made with Dubu mark. ${tokenOn ? "Genesis and CHOG holder" : "Genesis holder"} videos do not.`,
     },
     {
       q: "Does Dubu keep my videos?",

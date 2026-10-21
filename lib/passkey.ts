@@ -132,3 +132,41 @@ export function passkeyErrorMessage(e: unknown): string {
   }
   return e instanceof Error ? e.message : "Passkey sign-in failed.";
 }
+
+export type WalletExport = { phrase: string[]; privateKey: `0x${string}` };
+
+/**
+ * Re-derives the wallet's 24-word recovery phrase and private key for export.
+ *
+ * Always runs a fresh passkey prompt. Before returning anything it checks that
+ * the phrase and the key both open `expected`, so a wrong passkey (or a bug) can
+ * never show a phrase for a different wallet. Nothing is stored or sent anywhere.
+ */
+export async function exportPasskeyWallet(expected: string): Promise<WalletExport> {
+  const [{ entropyToMnemonic }, { wordlist }, { mnemonicToAccount, privateKeyToAccount }] = await Promise.all([
+    import("@scure/bip39"),
+    import("@scure/bip39/wordlists/english"),
+    import("viem/accounts"),
+  ]);
+
+  const known = rememberedPasskey();
+  const result = await getPasskeyPrfOutput({
+    rpId: rp().id,
+    ...(known ? { credential: { credentialId: known.credentialId, transports: known.transports } } : {}),
+  });
+  const prf = result.prfOutput;
+  try {
+    const phrase = entropyToMnemonic(prf, wordlist);
+    const keyBytes = deriveEvmPrivateKey({ prfOutput: prf, accountIndex: 0 });
+    const privateKey = `0x${Array.from(keyBytes, (b) => b.toString(16).padStart(2, "0")).join("")}` as `0x${string}`;
+    keyBytes.fill(0);
+
+    const want = expected.toLowerCase();
+    if (mnemonicToAccount(phrase).address.toLowerCase() !== want || privateKeyToAccount(privateKey).address.toLowerCase() !== want) {
+      throw new Error("That passkey opens a different wallet. Use the passkey for this account. Nothing was shown.");
+    }
+    return { phrase: phrase.split(" "), privateKey };
+  } finally {
+    prf.fill(0);
+  }
+}

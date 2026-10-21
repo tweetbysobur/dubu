@@ -39,6 +39,8 @@ Two ways, both end in the same signed server session:
 - **Passkey (default).** [Mera](https://github.com/category-labs/mera) (`@category-labs/mera`, pinned to 0.3.0) turns a passkey's PRF output into a standard EVM account (BIP-39 entropy, path `m/44'/60'/0'/0/0`, same as MetaMask). Face ID or a fingerprint creates the wallet on first use and reopens it after. The key exists only in the tab, only long enough to sign the login message, then it is wiped. No backend, no API key, no custody, no transactions.
 - **External wallet.** RainbowKit, for Chog holders whose Chog lives in an existing wallet. Connecting prompts the sign-in signature straight away.
 
+Passkey wallets can be exported from Profile: after a fresh passkey prompt, Dubu shows the 24-word recovery phrase (the PRF output as BIP-39 entropy) and the private key, after checking both open the account's address. Nothing is sent to the server or stored, and the view hides itself after two minutes.
+
 Passkeys are bound to the site's hostname (`dubuai.vercel.app`). Moving to another domain means passkeys from the old one stop working there, so plan any domain move before users store anything in a passkey wallet.
 
 Mera 0.3 declares an optional peer on `@wagmi/core` v3 for its wagmi connector, which Dubu does not use. An npm `overrides` entry pins that peer to the project's wagmi v2 so the install resolves.
