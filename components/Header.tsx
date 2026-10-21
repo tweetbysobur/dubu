@@ -95,6 +95,9 @@ function AccountMenu({ address, tier }: { address: string; tier: TierId }) {
           <p className="text-sm text-mute">{TIER_NAME[tier]}</p>
           <p className="mt-1 break-all text-sm font-medium tabular-nums">{address}</p>
           <div className="mt-4 grid gap-2">
+            <Link href="/deposit" onClick={() => setOpen(false)} className={buttonClass("primary")}>
+              Deposit
+            </Link>
             <Link href="/profile" onClick={() => setOpen(false)} className={buttonClass("ghost")}>
               Profile and linked wallets
             </Link>
@@ -152,7 +155,10 @@ function MobileMenu({ links, address, tier, signInHref }: { links: NavLink[]; ad
                   {TIER_NAME[tier]}
                 </p>
                 <p className="mt-1 break-all text-sm font-medium tabular-nums">{address}</p>
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <Link href="/deposit" onClick={() => setOpen(false)} className={`${buttonClass("primary", "lg")} mt-4 w-full`}>
+                  Deposit
+                </Link>
+                <div className="mt-2 grid grid-cols-2 gap-2">
                   <CopyAddress address={address} />
                   <SignOutButton onDone={() => setOpen(false)} />
                 </div>

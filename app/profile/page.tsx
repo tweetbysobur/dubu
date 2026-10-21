@@ -81,15 +81,14 @@ export default function ProfilePage() {
   return <Profile me={me.data} />;
 }
 
-function Profile({ me }: { me: NonNullable<ReturnType<typeof useMe>["data"]> }) {
-  const [main, ...linked] = me.wallets;
+function Profile({ me }: { me: Me }) {
+  const linked = me.wallets.slice(1);
   const [isPasskey, setIsPasskey] = useState(false);
   useEffect(() => {
     setIsPasskey(rememberedPasskey()?.address.toLowerCase() === me.address.toLowerCase());
   }, [me.address]);
 
   const holderSource = me.wallets.find((w) => w.holder);
-  const remaining = Math.max(0, me.limit - me.used);
 
   return (
     <main>
@@ -98,52 +97,15 @@ function Profile({ me }: { me: NonNullable<ReturnType<typeof useMe>["data"]> }) 
           <Avatar me={me} />
           <div className="min-w-0">
             <h1 className="font-display text-[34px] font-extrabold leading-tight tracking-[-0.04em] sm:text-5xl">Profile</h1>
-            <p className="text-sm font-medium text-mute">{TIER_NAME[me.tier]}</p>
+            <p className="mt-0.5 flex items-center gap-2 text-sm font-medium text-mute">
+              <span aria-hidden className={`size-2 rounded-full ${me.tier === "free" ? "bg-mute" : "bg-brand"}`} />
+              {TIER_NAME[me.tier]}
+            </p>
           </div>
         </div>
 
-        <Panel className="mt-8">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h2 className="font-display text-xl font-bold tracking-[-0.02em]">
-                {isPasskey ? "Your passkey wallet" : "Your sign-in wallet"}
-              </h2>
-              <p className="mt-1 text-sm text-mute">
-                {isPasskey ? "Made with a passkey on this device. Dubu never sees its key." : "The wallet you signed in with."}
-              </p>
-            </div>
-            <Holdings chogs={main?.chogs ?? 0} holder={main?.holder ?? false} balance={main?.chogBalance} tracked={me.chog.tracked} />
-          </div>
-          <p className="mt-4 break-all rounded-2xl bg-surface px-4 py-3 text-[15px] font-medium tabular-nums">{me.address}</p>
-
-          <dl className="mt-6 grid gap-5 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <dt className="text-sm text-mute">Level</dt>
-              <dd className="mt-1 flex items-center gap-2 font-semibold">
-                <span aria-hidden className={`size-2 rounded-full ${me.tier === "free" ? "bg-mute" : "bg-brand"}`} />
-                {TIER_NAME[me.tier]}
-              </dd>
-              <dd className="mt-1 text-sm leading-relaxed text-mute">{levelReason(me, holderSource?.address)}</dd>
-            </div>
-            {me.chog.tracked && (
-              <div>
-                <dt className="text-sm text-mute">CHOG across your wallets</dt>
-                <dd className="mt-1 font-semibold tabular-nums">{formatChog(me.chog.balance)} CHOG</dd>
-                {me.chog.min && (
-                  <dd className="mt-1 text-sm text-mute tabular-nums">CHOG holder level from {formatChog(me.chog.min)} CHOG</dd>
-                )}
-              </div>
-            )}
-            <div>
-              <dt className="text-sm text-mute">Videos left today</dt>
-              <dd className="mt-1 font-semibold tabular-nums">
-                {remaining} of {me.limit}
-              </dd>
-            </div>
-          </dl>
-        </Panel>
-
-        <Balances me={me} />
+        <WalletCard me={me} isPasskey={isPasskey} />
+        <LevelCard me={me} nftWallet={holderSource?.address} />
 
         {me.swap && <Swap address={me.address} monBalance={me.mon.balance} isPasskey={isPasskey} />}
 
@@ -177,35 +139,126 @@ function Avatar({ me }: { me: Me }) {
   );
 }
 
-/** CHOG across every wallet, MON in the sign-in wallet, with their official marks. */
-function Balances({ me }: { me: Me }) {
+function Icon({ d }: { d: string }) {
+  return (
+    <svg aria-hidden width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  );
+}
+
+/** The wallet at a glance: address, balances with their marks, and the actions that move money in. */
+function WalletCard({ me, isPasskey }: { me: Me; isPasskey: boolean }) {
+  const [copied, setCopied] = useState(false);
   const mon = me.mon.balance;
   const funded = mon !== null && Number(mon) > 0;
+  const chog = me.wallets[0]?.chogBalance ?? "0";
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(me.address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard blocked: the address is on the Deposit page to select by hand.
+    }
+  }
+
+  const action = "inline-flex h-12 flex-1 sm:flex-none sm:px-8 items-center justify-center gap-2 rounded-2xl text-[15px] font-semibold transition-colors";
+
   return (
-    <Panel className="mt-6">
-      <h2 className="font-display text-xl font-bold tracking-[-0.02em]">Balances</h2>
-      <ul className="mt-4 divide-y divide-line">
-        {me.chog.tracked && (
-          <li className="flex items-center gap-3 py-3.5">
-            <TokenIcon token="chog" size={40} />
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold">CHOG</p>
-              <p className="text-sm text-mute">Across your wallets</p>
-            </div>
-            <p className="text-right font-display text-xl font-bold tabular-nums">{formatChog(me.chog.balance)}</p>
-          </li>
-        )}
-        <li className="flex items-center gap-3 py-3.5">
-          <TokenIcon token="mon" size={40} />
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold">MON</p>
-            <p className="text-sm text-mute">{funded ? "In this wallet" : "Send MON on Monad to the address above"}</p>
-          </div>
-          <p className="text-right font-display text-xl font-bold tabular-nums">
-            {mon === null ? "-" : funded ? formatMon(mon) : "Not funded"}
+    <section aria-label="Wallet" className="mt-8 overflow-hidden rounded-3xl bg-brand text-white">
+      <div className="p-5 sm:p-7">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-medium text-white/80">{isPasskey ? "Passkey wallet" : "Sign-in wallet"} · Monad</p>
+          <button
+            type="button"
+            onClick={copy}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white/15 px-3 text-sm font-semibold tabular-nums hover:bg-white/25"
+            aria-label={copied ? "Address copied" : `Copy address ${me.address}`}
+          >
+            {copied ? "Copied" : short(me.address)}
+            {!copied && <Icon d="M9 9h10v10H9zM5 15V5h10" />}
+          </button>
+        </div>
+
+        <div className="mt-6 flex items-center gap-3">
+          <TokenIcon token="mon" size={40} className="ring-2 ring-white/30" />
+          <p className="font-display text-[44px] font-extrabold leading-none tracking-[-0.04em] tabular-nums sm:text-[56px]">
+            {mon === null ? "-" : formatMon(mon)}
+            <span className="ml-2 text-2xl font-bold tracking-[-0.02em] text-white/80 sm:text-3xl">MON</span>
           </p>
-        </li>
-      </ul>
+        </div>
+        {me.chog.tracked && (
+          <p className="mt-3 flex items-center gap-2 text-[15px] font-semibold tabular-nums text-white/90">
+            <TokenIcon token="chog" size={22} />
+            {formatChog(chog)} CHOG
+            {me.wallets.length > 1 && (
+              <span className="font-medium text-white/70">· {formatChog(me.chog.balance)} across all wallets</span>
+            )}
+          </p>
+        )}
+        {!funded && mon !== null && (
+          <p className="mt-4 text-sm leading-relaxed text-white/85">Add MON to buy CHOG and pay network fees.</p>
+        )}
+      </div>
+
+      <div className="flex gap-2 bg-brand-press/60 p-3 sm:p-4">
+        <Link href="/deposit" className={`${action} bg-white text-brand hover:bg-wash`}>
+          <Icon d="M12 5v14M5 12l7 7 7-7" />
+          Deposit
+        </Link>
+        {me.swap && (
+          <a href="#swap" className={`${action} bg-white/15 text-white hover:bg-white/25`}>
+            <Icon d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />
+            Get CHOG
+          </a>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** Level, what unlocks the next one, and today's videos. */
+function LevelCard({ me, nftWallet }: { me: Me; nftWallet?: string }) {
+  const remaining = Math.max(0, me.limit - me.used);
+  const min = me.chog.min ? Number(me.chog.min) : null;
+  const have = Number(me.chog.balance);
+  const progress = me.tier === "free" && min ? Math.min(1, have / min) : null;
+
+  return (
+    <Panel className="mt-4">
+      <div className="grid gap-6 sm:grid-cols-[1fr_auto] sm:items-start">
+        <div className="min-w-0">
+          <p className="text-sm text-mute">Level</p>
+          <p className="mt-1 font-display text-2xl font-bold tracking-[-0.02em]">{TIER_NAME[me.tier]}</p>
+          <p className="mt-1 max-w-[30rem] text-sm leading-relaxed text-mute">{levelReason(me, nftWallet)}</p>
+          {progress !== null && (
+            <div className="mt-4 max-w-[30rem]">
+              <div
+                className="h-2 overflow-hidden rounded-full bg-surface"
+                role="progressbar"
+                aria-label="Progress to CHOG holder"
+                aria-valuemin={0}
+                aria-valuemax={min!}
+                aria-valuenow={Math.min(have, min!)}
+              >
+                <div className="h-full rounded-full bg-brand" style={{ width: `${Math.max(progress * 100, have > 0 ? 2 : 0)}%` }} />
+              </div>
+              <p className="mt-2 text-sm font-medium tabular-nums">
+                {formatChog(me.chog.balance)} <span className="text-mute">of {formatChog(me.chog.min)} CHOG</span>
+              </p>
+            </div>
+          )}
+        </div>
+        <div className="rounded-2xl bg-surface px-5 py-4 sm:min-w-40 sm:text-right">
+          <p className="text-sm text-mute">Videos left today</p>
+          <p className="mt-1 font-display text-2xl font-bold tabular-nums">
+            {remaining}
+            <span className="text-base font-semibold text-mute"> of {me.limit}</span>
+          </p>
+        </div>
+      </div>
     </Panel>
   );
 }

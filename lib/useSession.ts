@@ -13,7 +13,7 @@ async function signInWith(address: string, sign: (message: string) => Promise<st
 }
 
 /** Read-only session for places like the header. Shares the cache with useSession. */
-export function useMe() {
+export function useMe(opts?: { refetchInterval?: number }) {
   return useQuery<Me | null>({
     queryKey: ["me"],
     queryFn: async () => {
@@ -26,6 +26,7 @@ export function useMe() {
     },
     retry: false,
     staleTime: 30_000,
+    refetchInterval: opts?.refetchInterval,
   });
 }
 
