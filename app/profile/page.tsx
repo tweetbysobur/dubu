@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAccount, useDisconnect, useSignMessage } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, formatChog, formatMon, TIER_NAME, type Me } from "@/lib/api";
+import { api, formatChog, formatMon, type Me } from "@/lib/api";
 import { useMe } from "@/lib/useSession";
 import { rememberedPasskey } from "@/lib/passkey";
 import { Alert, Button, Container, Panel, Spinner, buttonClass } from "@/components/ui";
@@ -13,6 +13,7 @@ import { Mascot } from "@/components/Mascot";
 import { ExportWallet } from "@/components/ExportWallet";
 import { Swap } from "@/components/Swap";
 import { TokenIcon } from "@/components/TokenIcon";
+import { LevelBadge } from "@/components/LevelBadge";
 
 const MAX_LINKED = 3;
 
@@ -97,10 +98,7 @@ function Profile({ me }: { me: Me }) {
           <Avatar me={me} />
           <div className="min-w-0">
             <h1 className="font-display text-[34px] font-extrabold leading-tight tracking-[-0.04em] sm:text-5xl">Profile</h1>
-            <p className="mt-0.5 flex items-center gap-2 text-sm font-medium text-mute">
-              <span aria-hidden className={`size-2 rounded-full ${me.tier === "free" ? "bg-mute" : "bg-brand"}`} />
-              {TIER_NAME[me.tier]}
-            </p>
+            <LevelBadge tier={me.tier} size="sm" className="mt-1.5" />
           </div>
         </div>
 
@@ -231,8 +229,8 @@ function LevelCard({ me, nftWallet }: { me: Me; nftWallet?: string }) {
       <div className="grid gap-6 sm:grid-cols-[1fr_auto] sm:items-start">
         <div className="min-w-0">
           <p className="text-sm text-mute">Level</p>
-          <p className="mt-1 font-display text-2xl font-bold tracking-[-0.02em]">{TIER_NAME[me.tier]}</p>
-          <p className="mt-1 max-w-[30rem] text-sm leading-relaxed text-mute">{levelReason(me, nftWallet)}</p>
+          <LevelBadge tier={me.tier} size="lg" className="mt-2" />
+          <p className="mt-3 max-w-[30rem] text-sm leading-relaxed text-mute">{levelReason(me, nftWallet)}</p>
           {progress !== null && (
             <div className="mt-4 max-w-[30rem]">
               <div

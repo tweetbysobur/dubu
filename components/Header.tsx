@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useHeroCtaOffscreen } from "@/lib/heroCta";
 import { useMe, useSignOut } from "@/lib/useSession";
-import { TIER_NAME, type TierId } from "@/lib/api";
+import type { TierId } from "@/lib/api";
+import { LevelBadge, LevelMark } from "./LevelBadge";
 import { Logo } from "./Logo";
 import { buttonClass, Spinner } from "./ui";
 
@@ -70,7 +71,6 @@ function SignOutButton({ onDone }: { onDone: () => void }) {
 
 /** Desktop account dropdown. */
 function AccountMenu({ address, tier }: { address: string; tier: TierId }) {
-  const holder = tier !== "free";
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(open, () => setOpen(false), ref);
@@ -84,7 +84,7 @@ function AccountMenu({ address, tier }: { address: string; tier: TierId }) {
         onClick={() => setOpen((v) => !v)}
         className="inline-flex h-11 items-center gap-2 rounded-2xl border border-line bg-white px-3.5 text-[15px] font-semibold tabular-nums hover:border-ink/30"
       >
-        <span aria-hidden className={`size-2 rounded-full ${holder ? "bg-brand" : "bg-mute"}`} />
+        <LevelMark tier={tier} size={22} />
         {short(address)}
         <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M6 9l6 6 6-6" />
@@ -92,8 +92,8 @@ function AccountMenu({ address, tier }: { address: string; tier: TierId }) {
       </button>
       {open && (
         <div className="absolute right-0 top-full z-30 mt-2 w-80 rounded-2xl border border-line bg-white p-4 shadow-[0_12px_32px_rgba(11,18,32,0.12)]">
-          <p className="text-sm text-mute">{TIER_NAME[tier]}</p>
-          <p className="mt-1 break-all text-sm font-medium tabular-nums">{address}</p>
+          <LevelBadge tier={tier} size="sm" />
+          <p className="mt-2 break-all text-sm font-medium tabular-nums">{address}</p>
           <div className="mt-4 grid gap-2">
             <Link href="/deposit" onClick={() => setOpen(false)} className={buttonClass("primary")}>
               Deposit
@@ -112,7 +112,6 @@ function AccountMenu({ address, tier }: { address: string; tier: TierId }) {
 
 /** Phone menu: three-line button that opens a full-width panel under the header. */
 function MobileMenu({ links, address, tier, signInHref }: { links: NavLink[]; address?: string; tier: TierId; signInHref: string }) {
-  const holder = tier !== "free";
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -150,11 +149,8 @@ function MobileMenu({ links, address, tier, signInHref }: { links: NavLink[]; ad
           <div className="border-t border-line bg-surface px-4 py-4">
             {address ? (
               <>
-                <p className="flex items-center gap-2 text-sm text-mute">
-                  <span aria-hidden className={`size-2 rounded-full ${holder ? "bg-brand" : "bg-mute"}`} />
-                  {TIER_NAME[tier]}
-                </p>
-                <p className="mt-1 break-all text-sm font-medium tabular-nums">{address}</p>
+                <LevelBadge tier={tier} size="sm" />
+                <p className="mt-2 break-all text-sm font-medium tabular-nums">{address}</p>
                 <Link href="/deposit" onClick={() => setOpen(false)} className={`${buttonClass("primary", "lg")} mt-4 w-full`}>
                   Deposit
                 </Link>

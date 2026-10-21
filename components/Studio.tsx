@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { trackJob } from "@/lib/notify";
+import { LevelBadge } from "./LevelBadge";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, TIER_NAME, type Me } from "@/lib/api";
 import { Alert, Button, Container, Panel } from "@/components/ui";
@@ -80,11 +81,9 @@ export function Studio({ me }: { me: Me }) {
             <h1 className="font-display text-[34px] font-extrabold leading-tight tracking-[-0.04em] sm:text-5xl">
               Make a video
             </h1>
-            <p className="mt-2 flex items-center gap-2 text-mute">
-              <span aria-hidden className={`size-2 rounded-full ${me.tier === "free" ? "bg-mute" : "bg-brand"}`} />
-              {me.watermark
-                ? `${TIER_NAME[me.tier]}. ${me.quality} with a small watermark.`
-                : `${TIER_NAME[me.tier]}. ${me.quality}, no watermark.`}
+            <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-mute">
+              <LevelBadge tier={me.tier} size="sm" />
+              {me.watermark ? `${me.quality} with a small watermark.` : `${me.quality}, no watermark.`}
             </p>
           </div>
           <p className="text-mute">
