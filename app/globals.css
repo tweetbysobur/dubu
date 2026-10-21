@@ -74,6 +74,15 @@ body {
   animation: shimmer 1.4s linear infinite;
 }
 
+/* Notifications slide in from above. */
+@keyframes dubu-toast-in {
+  from { opacity: 0; transform: translateY(-12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.dubu-toast {
+  animation: dubu-toast-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
 /* Chog showcase reel: two copies of the row slide left by one copy's width. */
 @keyframes dubu-reel {
   from { transform: translateX(0); }
@@ -91,7 +100,8 @@ body {
   .dubu-rec-ring,
   .dubu-star,
   .skeleton,
-  .dubu-reel {
+  .dubu-reel,
+  .dubu-toast {
     animation: none;
   }
 }

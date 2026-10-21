@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { trackJob } from "@/lib/notify";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, TIER_NAME, type Me } from "@/lib/api";
 import { Alert, Button, Container, Panel } from "@/components/ui";
@@ -54,6 +55,7 @@ export function Studio({ me }: { me: Me }) {
         body: JSON.stringify(hasChog ? { prompt, tokenId: activeChog?.tokenId } : { prompt, image: upload }),
       }),
     onSuccess: ({ id }) => {
+      trackJob(id); // announced with a notification when it finishes, wherever the user is
       qc.invalidateQueries({ queryKey: ["me"] });
       router.push(`/result/${encodeURIComponent(id)}`);
     },

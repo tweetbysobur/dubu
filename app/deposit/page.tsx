@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { formatChog, formatMon, type Me } from "@/lib/api";
 import { useMe } from "@/lib/useSession";
 import { activeChain } from "@/lib/chain";
-import { Alert, Button, Container, Panel, buttonClass } from "@/components/ui";
+import { Button, Container, Panel, buttonClass } from "@/components/ui";
 import { Mascot } from "@/components/Mascot";
 import { TokenIcon } from "@/components/TokenIcon";
 
@@ -44,25 +44,12 @@ export default function DepositPage() {
 function Deposit({ me }: { me: Me }) {
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
-  const [received, setReceived] = useState<string | null>(null);
-  const start = useRef<{ mon: number; chog: number } | null>(null);
+
+  const mon = me.mon.balance === null ? null : Number(me.mon.balance);
+  const chog = Number(me.wallets[0]?.chogBalance ?? 0);
 
   useEffect(() => setCanShare(typeof navigator !== "undefined" && typeof navigator.share === "function"), []);
 
-  // Compare against the balances when the page opened. Anything new is a deposit.
-  const mon = me.mon.balance === null ? null : Number(me.mon.balance);
-  const chog = Number(me.wallets[0]?.chogBalance ?? 0);
-  useEffect(() => {
-    if (mon === null) return;
-    if (!start.current) {
-      start.current = { mon, chog };
-      return;
-    }
-    const parts: string[] = [];
-    if (mon > start.current.mon) parts.push(`${formatMon(String(mon - start.current.mon))} MON`);
-    if (chog > start.current.chog) parts.push(`${formatChog(String(chog - start.current.chog))} CHOG`);
-    if (parts.length) setReceived(parts.join(" and "));
-  }, [mon, chog]);
 
   async function copy() {
     try {
@@ -97,12 +84,6 @@ function Deposit({ me }: { me: Me }) {
 
         <h1 className="mt-3 font-display text-[34px] font-extrabold leading-tight tracking-[-0.04em] sm:text-5xl">Deposit</h1>
         <p className="mt-2 leading-relaxed text-mute">Send MON or CHOG on Monad to your Dubu wallet.</p>
-
-        {received && (
-          <div className="mt-6">
-            <Alert tone="info">Received {received}. It is in your wallet now.</Alert>
-          </div>
-        )}
 
         <Panel className="mt-6">
           <div className="flex items-center justify-between gap-3">
@@ -175,7 +156,7 @@ function Deposit({ me }: { me: Me }) {
           </ul>
           <p className="mt-3 flex items-center gap-2 text-sm text-mute">
             <span aria-hidden className="size-2 animate-pulse rounded-full bg-brand motion-reduce:animate-none" />
-            Watching for deposits. Balances update here on their own.
+            Watching for deposits. You get a notification the moment one lands.
           </p>
         </Panel>
 

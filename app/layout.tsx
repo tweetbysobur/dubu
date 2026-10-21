@@ -5,6 +5,8 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { Toaster } from "@/components/Toaster";
+import { Watchers } from "@/components/Watchers";
 
 export const metadata: Metadata = {
   title: "Dubu: turn your Chog into a video",
@@ -23,6 +25,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           </div>
           <Footer />
+          <Toaster />
+          <Watchers />
         </Providers>
       </body>
     </html>

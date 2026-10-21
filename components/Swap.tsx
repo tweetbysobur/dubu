@@ -7,6 +7,7 @@ import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { api, ApiError, formatChog, formatMon } from "@/lib/api";
 import { activeChain } from "@/lib/chain";
 import { passkeyErrorMessage, signWithPasskey } from "@/lib/passkey";
+import { notify } from "@/lib/notify";
 import { TokenIcon } from "./TokenIcon";
 import { Alert, Button, Panel, Spinner } from "./ui";
 
@@ -117,8 +118,16 @@ export function Swap({ address, monBalance, isPasskey }: { address: string; monB
       }
       return api<Result>("/api/swap/send", { method: "POST", body: JSON.stringify({ hash }) });
     },
-    onSuccess: () => {
+    onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["me"] });
+      if (r.status === "success") {
+        notify({
+          tone: "celebrate",
+          token: "chog",
+          title: r.received ? `${formatChog(r.received)} CHOG bought` : "Swap complete",
+          body: "It is in your wallet now.",
+        });
+      }
     },
   });
 
