@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Container } from "./ui";
+import { ChogFrame } from "./ChogFrame";
 
 type Showcase = { enabled: boolean; ids: string[] };
 
@@ -19,21 +20,15 @@ export function ChogReel() {
   const tile = (id: string, copy: boolean) => (
     <li
       key={`${copy ? "b" : "a"}-${id}`}
-      className={`mr-4 w-36 shrink-0 sm:mr-5 sm:w-48 ${copy ? "motion-reduce:hidden" : ""}`}
+      className={`mr-3 w-40 shrink-0 sm:mr-4 sm:w-52 ${copy ? "motion-reduce:hidden" : ""}`}
       aria-hidden={copy || undefined}
     >
-      <div className="aspect-square overflow-hidden rounded-3xl bg-surface ring-1 ring-line">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`/api/chogs/${id}/image`}
-          alt={copy ? "" : `Chog Genesis #${id}`}
-          loading="lazy"
-          decoding="async"
-          className="size-full object-cover"
-          onError={() => setBroken((b) => new Set(b).add(id))}
-        />
-      </div>
-      <p className="mt-2 text-sm font-medium tabular-nums text-mute">#{id}</p>
+      <ChogFrame
+        tokenId={id}
+        src={`/api/chogs/${id}/image`}
+        alt={copy ? "" : `Chog Genesis #${id}`}
+        onError={() => setBroken((b) => new Set(b).add(id))}
+      />
     </li>
   );
 
@@ -50,7 +45,7 @@ export function ChogReel() {
         </div>
       </Container>
       {/* Margins, not gap, so one copy is exactly half the row and the loop has no jump. */}
-      <div className="dubu-reel-wrap mt-8 overflow-hidden pl-4 motion-reduce:overflow-x-auto sm:mt-10 sm:pl-6">
+      <div className="dubu-reel-wrap mt-8 overflow-hidden pl-4 motion-reduce:overflow-x-auto sm:mt-10 sm:pl-[max(1.5rem,calc((100vw-64rem)/2+1.5rem))]">
         <ul className="dubu-reel flex w-max">
           {ids.map((id) => tile(id, false))}
           {ids.map((id) => tile(id, true))}

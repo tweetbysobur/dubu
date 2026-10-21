@@ -7,12 +7,13 @@ import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, formatChog, formatMon, TIER_NAME, type Me } from "@/lib/api";
 import { useMe } from "@/lib/useSession";
-import { rememberedPasskey } from "@/lib/passkey";
+import { memoryFor } from "@/lib/passkey";
 import { Alert, Button, Container, Panel, Spinner, buttonClass } from "@/components/ui";
 import { Mascot } from "@/components/Mascot";
 import { ExportWallet } from "@/components/ExportWallet";
 import { Swap } from "@/components/Swap";
 import { TokenIcon } from "@/components/TokenIcon";
+import { ChogFrame } from "@/components/ChogFrame";
 import { LevelBadge, LevelMark } from "@/components/LevelBadge";
 import { notify } from "@/lib/notify";
 
@@ -87,7 +88,7 @@ function Profile({ me }: { me: Me }) {
   const linked = me.wallets.slice(1);
   const [isPasskey, setIsPasskey] = useState(false);
   useEffect(() => {
-    setIsPasskey(rememberedPasskey()?.address.toLowerCase() === me.address.toLowerCase());
+    setIsPasskey(!!memoryFor(me.address));
   }, [me.address]);
 
   const holderSource = me.wallets.find((w) => w.holder);
@@ -122,11 +123,12 @@ function Avatar({ me }: { me: Me }) {
   const chog = me.tokens[0];
   if (chog && !failed) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <ChogFrame
+        tokenId={chog.tokenId}
         src={`/api/chogs/${chog.tokenId}/image`}
         alt={chog.name}
-        className="size-16 shrink-0 rounded-2xl bg-surface object-cover ring-1 ring-line sm:size-20"
+        size="xs"
+        className="size-16 shrink-0 ring-1 ring-line sm:size-20"
         onError={() => setFailed(true)}
       />
     );

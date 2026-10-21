@@ -1,6 +1,7 @@
 "use client";
 
 import type { Me } from "@/lib/api";
+import { ChogFrame } from "./ChogFrame";
 
 export function ChogPicker({
   tokens,
@@ -15,8 +16,8 @@ export function ChogPicker({
 
   return (
     <div>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={active.image} alt={active.name} className="aspect-square w-full rounded-2xl bg-surface object-cover" />
+      {/* Through the viewfinder: this is the Chog Dubu is about to film. */}
+      <ChogFrame tokenId={active.tokenId} src={active.image} alt={active.name} size="lg" />
       <p className="mt-4 font-display text-lg font-bold tracking-[-0.01em]">{active.name}</p>
 
       {active.traits.length > 0 ? (

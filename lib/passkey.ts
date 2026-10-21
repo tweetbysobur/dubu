@@ -25,10 +25,16 @@ import {
 import { toViemAccount } from "@category-labs/mera/viem";
 import type { LocalAccount } from "viem";
 
-const MEMORY_KEY = "dubu.passkey";
+const MEMORY_KEY = "dubu.passkeys";
+const LEGACY_KEY = "dubu.passkey";
+const MAX_REMEMBERED = 5;
 
-/** Public data only: a credential id and an address. Neither can sign anything. */
-type PasskeyMemory = { credentialId: string; address: string; transports?: string[] };
+/**
+ * Public data only: a credential id and an address. Neither can sign anything,
+ * so forgetting one never touches the passkey or the wallet. It only stops
+ * this device from offering it first.
+ */
+export type PasskeyMemory = { credentialId: string; address: string; transports?: string[]; usedAt?: number };
 
 export function passkeySupported(): boolean {
   return (
@@ -43,28 +49,51 @@ function rp() {
   return { id: window.location.hostname, name: "Dubu" };
 }
 
-export function rememberedPasskey(): PasskeyMemory | null {
+function valid(m: PasskeyMemory) {
+  return typeof m?.credentialId === "string" && /^0x[0-9a-fA-F]{40}$/.test(m.address);
+}
+
+/** Accounts this device has used, most recent first. */
+export function rememberedPasskeys(): PasskeyMemory[] {
   try {
-    const raw = localStorage.getItem(MEMORY_KEY);
-    if (!raw) return null;
-    const m = JSON.parse(raw) as PasskeyMemory;
-    return typeof m.credentialId === "string" && /^0x[0-9a-fA-F]{40}$/.test(m.address) ? m : null;
+    const list = JSON.parse(localStorage.getItem(MEMORY_KEY) || "[]") as PasskeyMemory[];
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (legacy) {
+      const m = JSON.parse(legacy) as PasskeyMemory;
+      if (valid(m) && !list.some((x) => x.credentialId === m.credentialId)) list.push(m);
+      localStorage.removeItem(LEGACY_KEY);
+      localStorage.setItem(MEMORY_KEY, JSON.stringify(list));
+    }
+    return list.filter(valid).sort((a, b) => (b.usedAt ?? 0) - (a.usedAt ?? 0));
   } catch {
-    return null;
+    return [];
   }
+}
+
+export function rememberedPasskey(): PasskeyMemory | null {
+  return rememberedPasskeys()[0] ?? null;
 }
 
 function remember(m: PasskeyMemory) {
   try {
-    localStorage.setItem(MEMORY_KEY, JSON.stringify(m));
+    const rest = rememberedPasskeys().filter((x) => x.credentialId !== m.credentialId);
+    localStorage.setItem(MEMORY_KEY, JSON.stringify([{ ...m, usedAt: Date.now() }, ...rest].slice(0, MAX_REMEMBERED)));
   } catch {
     // Private mode or blocked storage: sign-in still works, it just asks which passkey next time.
   }
 }
 
-export function forgetPasskey() {
+/** The remembered entry for an address, so prompts ask for that account's passkey. */
+export function memoryFor(address: string): PasskeyMemory | null {
+  return rememberedPasskeys().find((m) => m.address.toLowerCase() === address.toLowerCase()) ?? null;
+}
+
+/** Removes one account (or all) from this device's list. The passkey and wallet are untouched. */
+export function forgetPasskey(credentialId?: string) {
   try {
-    localStorage.removeItem(MEMORY_KEY);
+    const left = credentialId ? rememberedPasskeys().filter((x) => x.credentialId !== credentialId) : [];
+    localStorage.setItem(MEMORY_KEY, JSON.stringify(left));
+    localStorage.removeItem(LEGACY_KEY);
   } catch {
     // nothing to clear
   }
@@ -83,9 +112,13 @@ function unlock(prfOutput: Uint8Array): Unlocked {
 
 /** Creates a new passkey on this device and the wallet it derives. */
 export async function createPasskeyWallet(): Promise<Unlocked> {
+  // Mera gives every new passkey a fresh random user handle, so this adds an
+  // account and never replaces one already on the device. The dated name tells
+  // them apart in the device's passkey picker.
+  const label = `Dubu wallet ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
   const result = await createPasskeyWithPrfOutput({
     rp: rp(),
-    user: { name: "Dubu wallet", displayName: "Dubu wallet" },
+    user: { name: label, displayName: label },
   });
   const unlocked = unlock(result.prfOutput);
   remember({
@@ -97,11 +130,14 @@ export async function createPasskeyWallet(): Promise<Unlocked> {
 }
 
 /**
- * Opens an existing passkey wallet. With `anyPasskey`, the browser offers every
- * Dubu passkey it knows, including ones synced from another device.
+ * Opens an existing passkey wallet: the one given, else the last used. With
+ * `anyPasskey`, the browser offers every Dubu passkey it knows, including ones
+ * synced from another device.
  */
-export async function openPasskeyWallet(anyPasskey = false): Promise<Unlocked> {
-  const known = anyPasskey ? null : rememberedPasskey();
+export async function openPasskeyWallet(anyPasskey = false, credentialId?: string): Promise<Unlocked> {
+  const known = anyPasskey
+    ? null
+    : (credentialId ? rememberedPasskeys().find((m) => m.credentialId === credentialId) : null) ?? rememberedPasskey();
   const result = await getPasskeyPrfOutput({
     rpId: rp().id,
     ...(known ? { credential: { credentialId: known.credentialId, transports: known.transports } } : {}),
@@ -150,7 +186,7 @@ export async function exportPasskeyWallet(expected: string): Promise<WalletExpor
     import("viem/accounts"),
   ]);
 
-  const known = rememberedPasskey();
+  const known = memoryFor(expected) ?? rememberedPasskey();
   const result = await getPasskeyPrfOutput({
     rpId: rp().id,
     ...(known ? { credential: { credentialId: known.credentialId, transports: known.transports } } : {}),
@@ -189,7 +225,7 @@ export type PasskeyTx = {
  * wiped as soon as the signature exists. Broadcasting is the server's job.
  */
 export async function signWithPasskey(expected: string, tx: PasskeyTx): Promise<`0x${string}`> {
-  const { account, end } = await openPasskeyWallet();
+  const { account, end } = await openPasskeyWallet(false, memoryFor(expected)?.credentialId);
   try {
     if (account.address.toLowerCase() !== expected.toLowerCase()) {
       throw new Error("That passkey opens a different wallet. Use the passkey for this account. Nothing was signed.");

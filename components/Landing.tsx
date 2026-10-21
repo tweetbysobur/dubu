@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, formatChog, type TierFacts } from "@/lib/api";
+import { api, formatChog, type TierFacts, type TierId } from "@/lib/api";
 import { useHeroCtaRef } from "@/lib/heroCta";
 import type { useSession } from "@/lib/useSession";
 import { Mascot, type Mood } from "./Mascot";
 import { Faq } from "./Faq";
 import { ChogReel } from "./ChogReel";
+import { ChogFrame, useTimecode } from "./ChogFrame";
+import { LevelMark } from "./LevelBadge";
 import { SignIn } from "./SignIn";
 import { buttonClass, Container } from "./ui";
 
@@ -28,17 +31,47 @@ export function Landing({ session }: { session: ReturnType<typeof useSession> })
   );
 }
 
-/** Camcorder viewfinder corners around the headline. */
-function Viewfinder({ children }: { children: React.ReactNode }) {
-  const corner = "pointer-events-none absolute size-7 border-brand sm:size-10";
+type Showcase = { enabled: boolean; ids: string[] };
+
+/** Real Chog Genesis art, one take at a time, through Dubu's viewfinder. Falls back to the mascot. */
+function HeroTakes() {
+  const showcase = useQuery<Showcase>({ queryKey: ["showcase"], queryFn: () => api<Showcase>("/api/showcase"), staleTime: Infinity });
+  const [broken, setBroken] = useState<Set<string>>(new Set());
+  const [take, setTake] = useState(0);
+  const ids = (showcase.data?.enabled ? showcase.data.ids : []).filter((id) => !broken.has(id));
+  const id = ids.length ? ids[take % ids.length] : null;
+  const frames = useTimecode(!!id, 0);
+
+  // A new take every 4 seconds. Holds still for reduced motion.
+  useEffect(() => {
+    if (ids.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const t = setInterval(() => setTake((n) => n + 1), 4000);
+    return () => clearInterval(t);
+  }, [ids.length]);
+
+  if (!id) return <Mascot mood="idle" size={320} className="mx-auto h-auto w-40 sm:w-52 md:w-full" />;
+  const next = ids[(take + 1) % ids.length];
+
   return (
-    <div className="relative px-5 py-8 sm:px-10 sm:py-12">
-      <span aria-hidden className={`${corner} left-0 top-0 rounded-tl-2xl border-l-[3px] border-t-[3px]`} />
-      <span aria-hidden className={`${corner} right-0 top-0 rounded-tr-2xl border-r-[3px] border-t-[3px]`} />
-      <span aria-hidden className={`${corner} bottom-0 left-0 rounded-bl-2xl border-b-[3px] border-l-[3px]`} />
-      <span aria-hidden className={`${corner} bottom-0 right-0 rounded-br-2xl border-b-[3px] border-r-[3px]`} />
-      {children}
-    </div>
+    <figure className="relative mx-auto w-full max-w-[24rem] pl-12 sm:max-w-[28rem] sm:pl-16 md:max-w-none">
+      <div key={id} className="dubu-cut">
+        <ChogFrame
+          tokenId={id}
+          src={`/api/chogs/${id}/image`}
+          alt={`Chog Genesis #${id}`}
+          size="lg"
+          frames={frames}
+          onError={() => setBroken((b) => new Set(b).add(id))}
+          className="shadow-[0_24px_60px_rgba(11,18,32,0.18)]"
+        />
+      </div>
+      {/* Warm the next take so the cut is instant. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={`/api/chogs/${next}/image`} alt="" aria-hidden className="hidden" />
+      {/* Dubu is the one filming. */}
+      <Mascot mood="rolling" size={120} className="absolute left-0 top-[58%] h-auto w-20 -translate-y-1/2 sm:w-28" />
+      <figcaption className="sr-only">Chog Genesis #{id}, filmed by Dubu</figcaption>
+    </figure>
   );
 }
 
@@ -46,21 +79,16 @@ function Hero({ session }: { session: ReturnType<typeof useSession> }) {
   const ctaRef = useHeroCtaRef<HTMLDivElement>();
   return (
     <section className="border-b border-line">
-      <Container className="grid items-center gap-6 py-10 sm:py-16 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] md:gap-6 md:py-24">
-        <Mascot mood="idle" size={320} className="h-auto w-32 sm:w-44 md:w-full" />
-        <Viewfinder>
-          <p className="flex items-center gap-2 text-sm font-semibold text-brand">
-            <span aria-hidden className="size-2.5 animate-pulse rounded-full bg-brand motion-reduce:animate-none" />
-            REC
-          </p>
-          <h1 className="mt-4 font-display text-[44px] font-extrabold leading-[0.95] tracking-[-0.045em] sm:text-[64px] lg:text-[80px]">
+      <Container className="grid items-center gap-12 py-10 sm:py-16 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:gap-14 md:py-20">
+        <div>
+          <h1 className="font-display text-[48px] font-extrabold leading-[0.92] tracking-[-0.05em] sm:text-[68px] lg:text-[84px]">
             Your Chog,
             <br />
             in motion.
           </h1>
-          <p className="mt-5 max-w-[34rem] text-[17px] leading-relaxed text-mute sm:text-lg">
-            Upload an image and describe a scene. Dubu turns it into a short video you can download. Chog Genesis
-            holders get their own Chog loaded in, sharper video and no watermark.
+          <p className="mt-6 max-w-[32rem] text-[17px] leading-relaxed text-mute sm:text-lg">
+            Pick your Chog, write one sentence, get a short video. Chog Genesis holders get their own Chog loaded in,
+            sharper video and no watermark. Everyone else can upload any image.
           </p>
           <div ref={ctaRef} id="sign-in" className="mt-8 scroll-mt-24">
             {session.state === "ready" && session.me ? (
@@ -76,7 +104,8 @@ function Hero({ session }: { session: ReturnType<typeof useSession> }) {
               <SignIn session={session} />
             )}
           </div>
-        </Viewfinder>
+        </div>
+        <HeroTakes />
       </Container>
     </section>
   );
@@ -129,7 +158,7 @@ function Compare({ tiers }: { tiers?: TierFacts }) {
   const tokenOn = !!tiers?.chogMin;
 
   const genesisRows: [string, string][] = [
-    ["Unlocks with", "Chog Genesis NFT"],
+    ["Unlocks with", "A Chog Genesis"],
     ["Image", "Your own Chog"],
     ["Prompt", "Uses its traits"],
     ["Video size", v(tiers?.holder.quality)],
@@ -165,19 +194,22 @@ function Compare({ tiers }: { tiers?: TierFacts }) {
             : "Dubu checks every wallet you link for a Chog Genesis NFT. Holders get the full studio. Everyone else can still make videos for free."}
         </p>
         <div className={`mt-10 grid gap-4 md:gap-5 ${tokenOn ? "lg:grid-cols-3" : "md:grid-cols-2"}`}>
-          <TierColumn title="Genesis holder" rows={genesisRows} featured />
-          {tokenOn && <TierColumn title="CHOG holder" rows={tokenRows} />}
-          <TierColumn title="Free" rows={freeRows} />
+          <TierColumn tier="holder" title="Genesis holder" rows={genesisRows} featured />
+          {tokenOn && <TierColumn tier="token" title="CHOG holder" rows={tokenRows} />}
+          <TierColumn tier="free" title="Free" rows={freeRows} />
         </div>
       </Container>
     </section>
   );
 }
 
-function TierColumn({ title, rows, featured }: { title: string; rows: [string, string][]; featured?: boolean }) {
+function TierColumn({ tier, title, rows, featured }: { tier: TierId; title: string; rows: [string, string][]; featured?: boolean }) {
   return (
     <div className={`rounded-3xl p-6 sm:p-8 ${featured ? "bg-brand text-white" : "border border-line bg-white"}`}>
-      <h3 className="font-display text-2xl font-bold tracking-[-0.02em]">{title}</h3>
+      <h3 className="flex items-center gap-3 font-display text-2xl font-bold tracking-[-0.02em]">
+        <LevelMark tier={tier} size={32} />
+        {title}
+      </h3>
       <dl className="mt-6">
         {rows.map(([label, value]) => (
           <div

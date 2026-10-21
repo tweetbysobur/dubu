@@ -55,6 +55,28 @@ function CopyAddress({ address }: { address: string }) {
   );
 }
 
+/** Signs out and opens the sign-in screen, where every account on this device is listed. */
+function SwitchAccountButton({ onDone }: { onDone: () => void }) {
+  const signOut = useSignOut();
+  return (
+    <button
+      type="button"
+      className={buttonClass("ghost")}
+      disabled={signOut.isPending}
+      onClick={() =>
+        signOut.mutate(undefined, {
+          onSettled: () => {
+            onDone();
+            window.location.assign("/#sign-in");
+          },
+        })
+      }
+    >
+      Switch account
+    </button>
+  );
+}
+
 function SignOutButton({ onDone }: { onDone: () => void }) {
   const signOut = useSignOut();
   return (
@@ -103,6 +125,7 @@ function AccountMenu({ address, tier }: { address: string; tier: TierId }) {
               Profile and linked wallets
             </Link>
             <CopyAddress address={address} />
+            <SwitchAccountButton onDone={() => setOpen(false)} />
             <SignOutButton onDone={() => setOpen(false)} />
           </div>
         </div>
@@ -253,6 +276,23 @@ function MobileMenu({ links, me, signInHref }: { links: NavLink[]; me: Me | null
 
           <div className="mt-auto pt-6">
             {me ? (
+              <div className="grid gap-2">
+              <button
+                type="button"
+                disabled={signOut.isPending}
+                onClick={() =>
+                  signOut.mutate(undefined, {
+                    onSettled: () => {
+                      close();
+                      window.location.assign("/#sign-in");
+                    },
+                  })
+                }
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-line text-[15px] font-semibold text-ink hover:bg-surface"
+              >
+                <Glyph d="M16 3l4 4-4 4M20 7H8M8 21l-4-4 4-4M4 17h12" size={18} />
+                Switch account
+              </button>
               <button
                 type="button"
                 disabled={signOut.isPending}
@@ -262,6 +302,7 @@ function MobileMenu({ links, me, signInHref }: { links: NavLink[]; me: Me | null
                 {signOut.isPending ? <Spinner /> : <Glyph d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 8l-4 4 4 4M6 12h10" size={18} />}
                 Sign out
               </button>
+              </div>
             ) : (
               <a href={signInHref} onClick={close} className={`${buttonClass("primary", "lg")} w-full`}>
                 Sign in

@@ -74,6 +74,22 @@ body {
   animation: shimmer 1.4s linear infinite;
 }
 
+/* Viewfinder REC light and the cut between hero takes. */
+@keyframes dubu-blink {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0.15; }
+}
+.dubu-rec-dot {
+  animation: dubu-blink 1.2s steps(1, end) infinite;
+}
+@keyframes dubu-cut {
+  from { opacity: 0; transform: scale(1.04); }
+  to { opacity: 1; transform: scale(1); }
+}
+.dubu-cut {
+  animation: dubu-cut 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
 /* Notifications slide in from above. */
 @keyframes dubu-toast-in {
   from { opacity: 0; transform: translateY(-12px) scale(0.98); }
@@ -101,7 +117,9 @@ body {
   .dubu-star,
   .skeleton,
   .dubu-reel,
-  .dubu-toast {
+  .dubu-toast,
+  .dubu-rec-dot,
+  .dubu-cut {
     animation: none;
   }
 }

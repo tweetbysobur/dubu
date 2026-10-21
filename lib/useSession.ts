@@ -90,10 +90,15 @@ export function useSession() {
   const done = () => qc.invalidateQueries({ queryKey: ["me"] });
 
   const passkey = useMutation({
-    mutationFn: async (mode: "create" | "open" | "open-any") => {
+    mutationFn: async (arg: "create" | "open" | "open-any" | { credentialId: string }) => {
       let wallet;
       try {
-        wallet = mode === "create" ? await createPasskeyWallet() : await openPasskeyWallet(mode === "open-any");
+        wallet =
+          arg === "create"
+            ? await createPasskeyWallet()
+            : typeof arg === "object"
+              ? await openPasskeyWallet(false, arg.credentialId)
+              : await openPasskeyWallet(arg === "open-any");
       } catch (e) {
         throw new Error(passkeyErrorMessage(e));
       }
