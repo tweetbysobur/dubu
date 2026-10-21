@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { api, type TierFacts } from "@/lib/api";
+import { api, formatChog, type TierFacts } from "@/lib/api";
 
 function items(t?: TierFacts): { q: string; a: string }[] {
   const free = t ? String(t.free.limit) : "a few";
@@ -14,15 +14,23 @@ function items(t?: TierFacts): { q: string; a: string }[] {
     },
     {
       q: "Do I need a Chog?",
-      a: `No. Anyone can make ${free} videos a day in free mode by uploading an image. Holder mode needs a Chog Genesis NFT on Monad.`,
+      a: `No. Anyone can make ${free} videos a day for free by uploading an image. Holding a Chog Genesis NFT${t?.chogMin ? " or CHOG" : ""} on Monad unlocks more.`,
     },
+    ...(t?.chogMin
+      ? [
+          {
+            q: "What is the difference between a Genesis holder and a CHOG holder?",
+            a: `A Chog Genesis NFT makes you a Genesis holder: your Chog loads into the studio, its traits shape the prompt, and you get ${t.holder.limit} videos a day. Holding at least ${formatChog(t.chogMin)} CHOG makes you a CHOG holder: ${t.token.quality} video, no watermark and ${t.token.limit} videos a day, with an image you upload.`,
+          },
+        ]
+      : []),
     {
       q: "What is a passkey wallet?",
       a: "When you continue with a passkey, your phone or computer creates one with Face ID, a fingerprint or your screen lock. Dubu turns it into a wallet address on your device. Dubu never sees the key, and there is no seed phrase to write down.",
     },
     {
-      q: "My Chog is in another wallet. How do I get holder mode?",
-      a: "Open Profile and link that wallet. You sign one message with it to prove it is yours. You can also sign in with that wallet directly.",
+      q: "My Chog is in another wallet. How do I get credit for it?",
+      a: "Open Profile and link that wallet. You sign one message with it to prove it is yours. Dubu adds up what all your linked wallets hold. You can also sign in with that wallet directly.",
     },
     {
       q: "Does Dubu cost gas or ask me to approve transactions?",

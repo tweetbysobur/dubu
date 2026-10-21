@@ -1,5 +1,5 @@
 import { imageSize } from "image-size";
-import type { Tier } from "./tiers";
+import { isSharp, type Tier } from "./tiers";
 
 // Provider selection: deAPI (free credits at signup), then Replicate, then demo mode.
 const DEAPI_KEY = process.env.DEAPI_API_KEY;
@@ -90,7 +90,7 @@ function envInt(name: string, fallback: number) {
 
 async function deapiCreate({ tier, image, prompt }: CreateArgs): Promise<string> {
   const { bytes, type } = await loadImage(image);
-  const longSide = tier === "holder" ? envInt("DEAPI_SIZE_HOLDER", 768) : envInt("DEAPI_SIZE_FREE", 512);
+  const longSide = isSharp(tier) ? envInt("DEAPI_SIZE_HOLDER", 768) : envInt("DEAPI_SIZE_FREE", 512);
   const { width, height } = outputSize(bytes, longSide);
 
   const form = new FormData();
@@ -142,9 +142,9 @@ async function deapiGet(requestId: string): Promise<VideoStatus> {
 // ---------- Replicate ----------
 
 function replicateExtra(tier: Tier): Record<string, unknown> {
-  const raw = tier === "holder" ? process.env.REPLICATE_INPUT_HOLDER : process.env.REPLICATE_INPUT_FREE;
+  const raw = isSharp(tier) ? process.env.REPLICATE_INPUT_HOLDER : process.env.REPLICATE_INPUT_FREE;
   try {
-    return raw ? JSON.parse(raw) : { resolution: tier === "holder" ? "720p" : "480p" };
+    return raw ? JSON.parse(raw) : { resolution: isSharp(tier) ? "720p" : "480p" };
   } catch {
     return {};
   }

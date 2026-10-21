@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { persistent, ping } from "@/lib/store";
 import { PROVIDER } from "@/lib/video";
+import { chogTracked } from "@/lib/standing";
+import { chogMinSetting } from "@/lib/tiers";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,8 @@ export async function GET() {
       storeOk,
       video: PROVIDER,
       chogContract: Boolean(process.env.CHOG_CONTRACT_ADDRESS),
+      chogToken: chogTracked(),
+      chogTokenMin: chogMinSetting() !== null,
       sessionSecret: (process.env.SESSION_SECRET?.length ?? 0) >= 32,
     },
     { status: storeOk ? 200 : 503 },

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAccount, useDisconnect, useSignMessage } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, formatChog, TIER_NAME, type Me } from "@/lib/api";
 import { useMe } from "@/lib/useSession";
 import { rememberedPasskey } from "@/lib/passkey";
 import { Alert, Button, Container, Panel, Spinner, buttonClass } from "@/components/ui";
@@ -17,10 +17,34 @@ function short(a: string) {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
 }
 
-/** Holder status can be confirmed even when the Chogs themselves cannot be listed. */
+/** Holder status can be confirmed even when the NFTs themselves cannot be listed. */
 function chogLabel(n: number, holder: boolean) {
-  if (n === 0) return holder ? "Holds a Chog" : "No Chog";
-  return n === 1 ? "1 Chog" : `${n} Chogs`;
+  if (n === 0) return holder ? "Holds a Chog Genesis" : "No Chog Genesis";
+  return n === 1 ? "1 Chog Genesis" : `${n} Chog Genesis`;
+}
+
+/** What a wallet holds: Chog Genesis NFTs, and CHOG when balances are tracked. */
+function Holdings({ chogs, holder, balance, tracked }: { chogs: number; holder: boolean; balance?: string; tracked: boolean }) {
+  return (
+    <p className="flex flex-wrap gap-x-3 text-sm text-mute tabular-nums">
+      <span>{chogLabel(chogs, holder)}</span>
+      {tracked && <span>{formatChog(balance)} CHOG</span>}
+    </p>
+  );
+}
+
+function levelReason(me: Me, nftWallet?: string): string {
+  if (me.tier === "holder") {
+    return nftWallet && nftWallet !== me.address.toLowerCase()
+      ? `From the Chog Genesis in ${short(nftWallet)}. Your Chog loads into the studio.`
+      : "Your Chog Genesis is in this wallet. It loads into the studio.";
+  }
+  if (me.tier === "token") {
+    return `You hold ${formatChog(me.chog.balance)} CHOG across your wallets. Add a Chog Genesis NFT for the full studio.`;
+  }
+  return me.chog.min
+    ? `Hold ${formatChog(me.chog.min)} CHOG or a Chog Genesis NFT across your wallets to level up.`
+    : "Link a wallet that holds a Chog Genesis NFT to become a Genesis holder.";
 }
 
 export default function ProfilePage() {
@@ -79,25 +103,28 @@ function Profile({ me }: { me: NonNullable<ReturnType<typeof useMe>["data"]> }) 
                 {isPasskey ? "Made with a passkey on this device. Dubu never sees its key." : "The wallet you signed in with."}
               </p>
             </div>
-            <span className="text-sm text-mute">{chogLabel(main?.chogs ?? 0, main?.holder ?? false)}</span>
+            <Holdings chogs={main?.chogs ?? 0} holder={main?.holder ?? false} balance={main?.chogBalance} tracked={me.chog.tracked} />
           </div>
           <p className="mt-4 break-all rounded-2xl bg-surface px-4 py-3 text-[15px] font-medium tabular-nums">{me.address}</p>
 
-          <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-            <div>
-              <dt className="text-sm text-mute">Mode</dt>
+          <dl className="mt-6 grid gap-5 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <dt className="text-sm text-mute">Level</dt>
               <dd className="mt-1 flex items-center gap-2 font-semibold">
-                <span aria-hidden className={`size-2 rounded-full ${me.tier === "holder" ? "bg-brand" : "bg-mute"}`} />
-                {me.tier === "holder" ? "Holder mode" : "Free mode"}
+                <span aria-hidden className={`size-2 rounded-full ${me.tier === "free" ? "bg-mute" : "bg-brand"}`} />
+                {TIER_NAME[me.tier]}
               </dd>
-              <dd className="mt-1 text-sm text-mute">
-                {me.tier === "holder" && holderSource
-                  ? holderSource.address === me.address.toLowerCase()
-                    ? "Your Chog is in this wallet."
-                    : `From the Chog in ${short(holderSource.address)}.`
-                  : "Link a wallet that holds a Chog to unlock holder mode."}
-              </dd>
+              <dd className="mt-1 text-sm leading-relaxed text-mute">{levelReason(me, holderSource?.address)}</dd>
             </div>
+            {me.chog.tracked && (
+              <div>
+                <dt className="text-sm text-mute">CHOG across your wallets</dt>
+                <dd className="mt-1 font-semibold tabular-nums">{formatChog(me.chog.balance)} CHOG</dd>
+                {me.chog.min && (
+                  <dd className="mt-1 text-sm text-mute tabular-nums">CHOG holder level from {formatChog(me.chog.min)} CHOG</dd>
+                )}
+              </div>
+            )}
             <div>
               <dt className="text-sm text-mute">Videos left today</dt>
               <dd className="mt-1 font-semibold tabular-nums">
@@ -107,13 +134,21 @@ function Profile({ me }: { me: NonNullable<ReturnType<typeof useMe>["data"]> }) 
           </dl>
         </Panel>
 
-        <LinkedWallets linked={linked} account={me.address} />
+        <LinkedWallets linked={linked} account={me.address} tracked={me.chog.tracked} />
       </Container>
     </main>
   );
 }
 
-function LinkedWallets({ linked, account }: { linked: { address: string; chogs: number; holder: boolean }[]; account: string }) {
+function LinkedWallets({
+  linked,
+  account,
+  tracked,
+}: {
+  linked: { address: string; chogs: number; holder: boolean; chogBalance: string }[];
+  account: string;
+  tracked: boolean;
+}) {
   const qc = useQueryClient();
   const { address: connected, isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
@@ -180,8 +215,8 @@ function LinkedWallets({ linked, account }: { linked: { address: string; chogs: 
     <Panel className="mt-6">
       <h2 className="font-display text-xl font-bold tracking-[-0.02em]">Linked wallets</h2>
       <p className="mt-1 max-w-[36rem] text-sm leading-relaxed text-mute">
-        Link the wallet that holds your Chog to use holder mode here. You sign one message to prove the wallet is yours.
-        Nothing moves and there is no gas.
+        Link the wallets that hold your Chog Genesis or CHOG. Dubu counts them all toward your level. You sign one message
+        per wallet to prove it is yours. Nothing moves and there is no gas.
       </p>
 
       {linked.length > 0 ? (
@@ -190,7 +225,7 @@ function LinkedWallets({ linked, account }: { linked: { address: string; chogs: 
             <li key={w.address} className="flex flex-wrap items-center justify-between gap-3 py-3.5">
               <div className="min-w-0">
                 <p className="font-semibold tabular-nums">{short(w.address)}</p>
-                <p className="text-sm text-mute">{chogLabel(w.chogs, w.holder)}</p>
+                <Holdings chogs={w.chogs} holder={w.holder} balance={w.chogBalance} tracked={tracked} />
               </div>
               <Button
                 variant="ghost"

@@ -27,7 +27,7 @@ export function decodeJob(token: string): Job | null {
     if (typeof d.i !== "string" || typeof d.a !== "string" || typeof d.p !== "string" || typeof d.c !== "number") {
       return null;
     }
-    if (d.t !== "holder" && d.t !== "free") return null;
+    if (d.t !== "holder" && d.t !== "token" && d.t !== "free") return null;
     if (Date.now() - d.c > JOB_TTL_MS) return null;
     return { id: d.i, address: d.a, tier: d.t, prompt: d.p, createdAt: d.c };
   } catch {

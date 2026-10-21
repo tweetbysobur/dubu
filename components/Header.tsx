@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useHeroCtaOffscreen } from "@/lib/heroCta";
 import { useMe, useSignOut } from "@/lib/useSession";
+import { TIER_NAME, type TierId } from "@/lib/api";
 import { Logo } from "./Logo";
 import { buttonClass, Spinner } from "./ui";
 
@@ -68,7 +69,8 @@ function SignOutButton({ onDone }: { onDone: () => void }) {
 }
 
 /** Desktop account dropdown. */
-function AccountMenu({ address, holder }: { address: string; holder: boolean }) {
+function AccountMenu({ address, tier }: { address: string; tier: TierId }) {
+  const holder = tier !== "free";
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(open, () => setOpen(false), ref);
@@ -90,7 +92,7 @@ function AccountMenu({ address, holder }: { address: string; holder: boolean }) 
       </button>
       {open && (
         <div className="absolute right-0 top-full z-30 mt-2 w-80 rounded-2xl border border-line bg-white p-4 shadow-[0_12px_32px_rgba(11,18,32,0.12)]">
-          <p className="text-sm text-mute">{holder ? "Holder mode" : "Free mode"}</p>
+          <p className="text-sm text-mute">{TIER_NAME[tier]}</p>
           <p className="mt-1 break-all text-sm font-medium tabular-nums">{address}</p>
           <div className="mt-4 grid gap-2">
             <Link href="/profile" onClick={() => setOpen(false)} className={buttonClass("ghost")}>
@@ -106,7 +108,8 @@ function AccountMenu({ address, holder }: { address: string; holder: boolean }) 
 }
 
 /** Phone menu: three-line button that opens a full-width panel under the header. */
-function MobileMenu({ links, address, holder, signInHref }: { links: NavLink[]; address?: string; holder: boolean; signInHref: string }) {
+function MobileMenu({ links, address, tier, signInHref }: { links: NavLink[]; address?: string; tier: TierId; signInHref: string }) {
+  const holder = tier !== "free";
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -146,7 +149,7 @@ function MobileMenu({ links, address, holder, signInHref }: { links: NavLink[]; 
               <>
                 <p className="flex items-center gap-2 text-sm text-mute">
                   <span aria-hidden className={`size-2 rounded-full ${holder ? "bg-brand" : "bg-mute"}`} />
-                  {holder ? "Holder mode" : "Free mode"}
+                  {TIER_NAME[tier]}
                 </p>
                 <p className="mt-1 break-all text-sm font-medium tabular-nums">{address}</p>
                 <div className="mt-4 grid grid-cols-2 gap-2">
@@ -218,7 +221,7 @@ export function Header() {
               );
             })}
           </nav>
-          {signedIn && me.data && <AccountMenu address={me.data.address} holder={me.data.tier === "holder"} />}
+          {signedIn && me.data && <AccountMenu address={me.data.address} tier={me.data.tier} />}
           {!signedIn && me.data === null && (!landing || heroCtaOffscreen) && (
             <a href={signInHref} className={buttonClass("primary")}>
               Sign in
@@ -226,7 +229,7 @@ export function Header() {
           )}
         </div>
 
-        <MobileMenu links={links} address={me.data?.address} holder={me.data?.tier === "holder"} signInHref={signInHref} />
+        <MobileMenu links={links} address={me.data?.address} tier={me.data?.tier ?? "free"} signInHref={signInHref} />
       </div>
     </header>
   );

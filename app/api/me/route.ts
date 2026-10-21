@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionAddress } from "@/lib/session";
-import { getAccountHolderStatus } from "@/lib/chog";
+import { getStanding } from "@/lib/standing";
 import { accountAddresses } from "@/lib/links";
 import { dailyLimit, TIER_INFO } from "@/lib/tiers";
 import { getUsed } from "@/lib/limits";
@@ -9,17 +9,17 @@ import { fail } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
-/** Verifies the signed-in wallet's Chog ownership and returns its tier. */
+/** The signed-in account's level, from Chog Genesis NFTs and CHOG balance across its wallets. */
 export async function GET() {
   const address = await getSessionAddress();
   if (!address) return fail(401, "Not signed in.");
 
   let status;
   try {
-    status = await getAccountHolderStatus(await accountAddresses(address));
+    status = await getStanding(await accountAddresses(address));
   } catch (e) {
     console.error("[me] ownership check failed", e);
-    return fail(502, "Could not reach Monad to check your Chog. Try again.");
+    return fail(502, "Could not reach Monad to check your Chog holdings. Try again.");
   }
 
   let used: number;
@@ -30,13 +30,14 @@ export async function GET() {
     return fail(503, "Usage service is unavailable. Try again shortly.");
   }
 
-  const tier = status.holder ? "holder" : "free";
+  const tier = status.tier;
   return NextResponse.json({
     address,
     tier,
     ...TIER_INFO[tier],
     tokens: status.tokens,
-    wallets: status.perWallet,
+    wallets: status.wallets,
+    chog: status.chog,
     used,
     limit: dailyLimit(tier),
     mock: MOCK,

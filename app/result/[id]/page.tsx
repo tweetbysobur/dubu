@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { api, ApiError, type JobStatus } from "@/lib/api";
+import { api, ApiError, TIER_NAME, type JobStatus } from "@/lib/api";
 import { burnWatermark, saveBlob } from "@/lib/watermark";
 import { Alert, Button, Container, buttonClass } from "@/components/ui";
 import { Mascot, type Mood } from "@/components/Mascot";
@@ -136,8 +136,8 @@ export default function ResultPage() {
                 <h2 className="text-sm font-medium text-mute">Prompt</h2>
                 <p className="mt-1 text-lg leading-relaxed">{job.data.prompt}</p>
                 <p className="mt-3 flex items-center gap-2 text-sm text-mute">
-                  <span aria-hidden className={`size-2 shrink-0 rounded-full ${job.data.tier === "holder" ? "bg-brand" : "bg-mute"}`} />
-                  {job.data.tier === "holder" ? "Holder mode. No watermark." : "Free mode. Download has a watermark."}
+                  <span aria-hidden className={`size-2 shrink-0 rounded-full ${job.data.tier === "free" ? "bg-mute" : "bg-brand"}`} />
+                  {job.data.watermark ? `${TIER_NAME[job.data.tier]}. Download has a watermark.` : `${TIER_NAME[job.data.tier]}. No watermark.`}
                 </p>
               </div>
               <div className="flex flex-col gap-3 sm:w-56">

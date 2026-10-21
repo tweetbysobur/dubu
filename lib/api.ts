@@ -21,28 +21,49 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+export type TierId = "holder" | "token" | "free";
+
+export const TIER_NAME: Record<TierId, string> = {
+  holder: "Genesis holder",
+  token: "CHOG holder",
+  free: "Free mode",
+};
+
+/** Whole-token CHOG amount for display, e.g. "12,500.5". */
+export function formatChog(amount: string | null | undefined): string {
+  const n = Number(amount ?? 0);
+  return Number.isFinite(n) ? new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(n) : "0";
+}
+
 export type Me = {
   address: string;
-  tier: "holder" | "free";
+  tier: TierId;
   label: string;
   quality: string;
   watermark: boolean;
   tokens: { tokenId: string; name: string; image: string; traits: { trait_type: string; value: string }[]; owner?: string }[];
   /** Sign-in address first, then linked wallets. */
-  wallets: { address: string; chogs: number; holder: boolean }[];
+  wallets: { address: string; chogs: number; holder: boolean; chogBalance: string }[];
+  chog: { tracked: boolean; balance: string; min: string | null };
   used: number;
   limit: number;
   mock: boolean;
 };
 
 type TierFact = { label: string; quality: string; watermark: boolean; limit: number };
-export type TierFacts = { holder: TierFact; free: TierFact; clipSeconds: number | null };
+export type TierFacts = {
+  holder: TierFact;
+  token: TierFact;
+  free: TierFact;
+  chogMin: string | null;
+  clipSeconds: number | null;
+};
 
 export type JobStatus = {
   id: string;
   status: "processing" | "succeeded" | "failed";
   error?: string;
-  tier: "holder" | "free";
+  tier: TierId;
   watermark: boolean;
   prompt: string;
   videoUrl?: string;

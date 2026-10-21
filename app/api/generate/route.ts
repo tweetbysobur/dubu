@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionAddress } from "@/lib/session";
-import { getAccountHolderStatus, getOwnedTokenAny, type ChogToken } from "@/lib/chog";
+import { getOwnedTokenAny, type ChogToken } from "@/lib/chog";
+import { getStanding } from "@/lib/standing";
 import { accountAddresses } from "@/lib/links";
 import { dailyLimit, type Tier } from "@/lib/tiers";
 import {
@@ -53,16 +54,16 @@ export async function POST(req: Request) {
   let addresses: string[];
   try {
     addresses = await accountAddresses(address);
-    status = await getAccountHolderStatus(addresses);
+    status = await getStanding(addresses);
   } catch (e) {
     console.error("[generate] ownership check failed", e);
     return fail(502, "Could not verify your Chog right now. Try again.");
   }
-  const tier: Tier = status.holder ? "holder" : "free";
+  const tier: Tier = status.tier;
 
   const limit = dailyLimit(tier);
   const limitMessage =
-    tier === "free" ? "Daily free limit reached. Hold a Chog to unlock more." : "Daily limit reached. Come back tomorrow.";
+    tier === "free" ? "Daily free limit reached. Hold a Chog or CHOG to unlock more." : "Daily limit reached. Come back tomorrow.";
 
   // Cheap early exit. The atomic check happens in reserveUse below.
   try {

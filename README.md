@@ -21,6 +21,7 @@ Video provider: deAPI when `DEAPI_API_KEY` is set (free $5 credit at signup, no 
 | `NEXT_PUBLIC_MONAD_NETWORK` | `mainnet` (chain 143) or `testnet` (chain 10143) |
 | `SESSION_SECRET` | Signs the session cookie. 32+ chars. Required in production |
 | `NEXT_PUBLIC_WC_PROJECT_ID` | WalletConnect project ID. Injected wallets work without it |
+| `CHOG_TOKEN_ADDRESS` / `CHOG_TOKEN_MIN` | CHOG token on Monad (`0x3500...7777`) and the minimum for the CHOG holder level. Empty minimum keeps that level off |
 | `CHOG_CONTRACT_ADDRESS` | Chog Genesis ERC-721, `0xc96d31f8626c6d03fae5dcd3d61e3fb9f4a73763` on mainnet. Without it, every wallet is free tier |
 | `ALCHEMY_API_KEY` | Lists token IDs when the contract is not ERC721Enumerable |
 | `DEAPI_API_KEY` | deAPI key (free credits). Takes priority over Replicate. Server only |
@@ -41,6 +42,16 @@ Two ways, both end in the same signed server session:
 Passkeys are bound to the site's hostname (`dubuai.vercel.app`). Moving to another domain means passkeys from the old one stop working there, so plan any domain move before users store anything in a passkey wallet.
 
 Mera 0.3 declares an optional peer on `@wagmi/core` v3 for its wagmi connector, which Dubu does not use. An npm `overrides` entry pins that peer to the project's wagmi v2 so the install resolves.
+
+## Levels
+
+| Level | Unlocks with | Gets |
+| --- | --- | --- |
+| Genesis holder | A Chog Genesis NFT in any linked wallet | Own Chog loaded in, trait-aware prompt, sharper video, no watermark, `HOLDER_DAILY_LIMIT` (50) a day |
+| CHOG holder | At least `CHOG_TOKEN_MIN` CHOG summed across linked wallets | Upload any image, sharper video, no watermark, `TOKEN_DAILY_LIMIT` (10) a day |
+| Free | Signing in | Upload any image, standard video, watermark, `FREE_DAILY_LIMIT` (3) a day |
+
+The CHOG holder level stays off until `CHOG_TOKEN_MIN` is set. Balances are still read and shown on Profile when `CHOG_TOKEN_ADDRESS` is set. The level is re-checked on every generation.
 
 ## Linked wallets
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type Me } from "@/lib/api";
+import { api, TIER_NAME, type Me } from "@/lib/api";
 import { Alert, Button, Container, Panel } from "@/components/ui";
 import { Mascot } from "@/components/Mascot";
 import { ChogPicker } from "@/components/ChogPicker";
@@ -79,10 +79,10 @@ export function Studio({ me }: { me: Me }) {
               Make a video
             </h1>
             <p className="mt-2 flex items-center gap-2 text-mute">
-              <span aria-hidden className={`size-2 rounded-full ${holder ? "bg-brand" : "bg-mute"}`} />
-              {holder
-                ? `Holder mode. ${me.quality}, no watermark.`
-                : `Free mode. ${me.quality} with a small watermark.`}
+              <span aria-hidden className={`size-2 rounded-full ${me.tier === "free" ? "bg-mute" : "bg-brand"}`} />
+              {me.watermark
+                ? `${TIER_NAME[me.tier]}. ${me.quality} with a small watermark.`
+                : `${TIER_NAME[me.tier]}. ${me.quality}, no watermark.`}
             </p>
           </div>
           <p className="text-mute">
@@ -114,11 +114,11 @@ export function Studio({ me }: { me: Me }) {
                 <>
                   <ImageUpload value={upload} onChange={setUpload} />
                   <p className="mt-4 text-sm leading-relaxed text-mute">
-                    Hold a Chog Genesis NFT?{" "}
+                    {me.tier === "token" ? "Hold a Chog Genesis NFT too? " : me.chog.min ? "Hold a Chog Genesis NFT or CHOG? " : "Hold a Chog Genesis NFT? "}
                     <Link href="/profile" className="font-semibold text-brand hover:text-brand-press">
                       Link its wallet
                     </Link>{" "}
-                    to skip this step and unlock holder mode.
+                    {me.tier === "token" ? "and Dubu loads your Chog in." : "to unlock more."}
                   </p>
                 </>
               )}

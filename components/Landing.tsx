@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { api, type TierFacts } from "@/lib/api";
+import { api, formatChog, type TierFacts } from "@/lib/api";
 import { useHeroCtaRef } from "@/lib/heroCta";
 import type { useSession } from "@/lib/useSession";
 import { Mascot, type Mood } from "./Mascot";
@@ -73,7 +73,7 @@ function HowItWorks({ clipSeconds }: { clipSeconds: number | null }) {
     {
       mood: "idle",
       title: "Sign in",
-      body: "Use a passkey for a free Dubu wallet, or connect the wallet that holds your Chog. Holders get their Chog loaded in.",
+      body: "Use a passkey for a free Dubu wallet, or connect a wallet. Dubu checks your linked wallets for a Chog Genesis NFT and CHOG.",
     },
     {
       mood: "rolling",
@@ -111,19 +111,32 @@ function HowItWorks({ clipSeconds }: { clipSeconds: number | null }) {
 
 function Compare({ tiers }: { tiers?: TierFacts }) {
   const v = (s?: string | number) => (s === undefined ? "-" : String(s));
-  const holderRows: [string, string][] = [
-    ["Image", "Your Chog, from your wallet"],
-    ["Prompt", "Adds your Chog's traits"],
+  const mark = (w?: boolean) => (w === undefined ? "-" : w ? "Small Dubu mark" : "None");
+  const tokenOn = !!tiers?.chogMin;
+
+  const genesisRows: [string, string][] = [
+    ["Unlocks with", "Chog Genesis NFT"],
+    ["Image", "Your own Chog"],
+    ["Prompt", "Uses its traits"],
     ["Video size", v(tiers?.holder.quality)],
     ["Videos per day", v(tiers?.holder.limit)],
-    ["Watermark", tiers ? (tiers.holder.watermark ? "Yes" : "None") : "-"],
+    ["Watermark", mark(tiers?.holder.watermark)],
+  ];
+  const tokenRows: [string, string][] = [
+    ["Unlocks with", tiers?.chogMin ? `${formatChog(tiers.chogMin)} CHOG` : "-"],
+    ["Image", "Any image you upload"],
+    ["Prompt", "Your words only"],
+    ["Video size", v(tiers?.token.quality)],
+    ["Videos per day", v(tiers?.token.limit)],
+    ["Watermark", mark(tiers?.token.watermark)],
   ];
   const freeRows: [string, string][] = [
+    ["Unlocks with", "Signing in"],
     ["Image", "Any image you upload"],
     ["Prompt", "Your words only"],
     ["Video size", v(tiers?.free.quality)],
     ["Videos per day", v(tiers?.free.limit)],
-    ["Watermark", tiers ? (tiers.free.watermark ? "Small Dubu mark" : "None") : "-"],
+    ["Watermark", mark(tiers?.free.watermark)],
   ];
 
   return (
@@ -132,13 +145,15 @@ function Compare({ tiers }: { tiers?: TierFacts }) {
         <h2 className="font-display text-[34px] font-extrabold leading-tight tracking-[-0.035em] sm:text-[44px]">
           Holders get the full studio
         </h2>
-        <p className="mt-3 max-w-[36rem] text-lg leading-relaxed text-mute">
-          Hold a Chog Genesis NFT on Monad and Dubu switches your wallet to holder mode. Everyone else can still make
-          videos in free mode.
+        <p className="mt-3 max-w-[38rem] text-lg leading-relaxed text-mute">
+          {tokenOn
+            ? "Dubu checks every wallet you link for a Chog Genesis NFT and your CHOG balance, then picks your level. Everyone else can still make videos for free."
+            : "Dubu checks every wallet you link for a Chog Genesis NFT. Holders get the full studio. Everyone else can still make videos for free."}
         </p>
-        <div className="mt-10 grid gap-4 md:grid-cols-2 md:gap-6">
-          <TierColumn title="Holder mode" rows={holderRows} featured />
-          <TierColumn title="Free mode" rows={freeRows} />
+        <div className={`mt-10 grid gap-4 md:gap-5 ${tokenOn ? "lg:grid-cols-3" : "md:grid-cols-2"}`}>
+          <TierColumn title="Genesis holder" rows={genesisRows} featured />
+          {tokenOn && <TierColumn title="CHOG holder" rows={tokenRows} />}
+          <TierColumn title="Free" rows={freeRows} />
         </div>
       </Container>
     </section>
@@ -155,7 +170,7 @@ function TierColumn({ title, rows, featured }: { title: string; rows: [string, s
             key={label}
             className={`flex items-baseline justify-between gap-4 border-t py-3.5 ${featured ? "border-white/25" : "border-line"}`}
           >
-            <dt className={featured ? "text-white/80" : "text-mute"}>{label}</dt>
+            <dt className={`whitespace-nowrap ${featured ? "text-white/80" : "text-mute"}`}>{label}</dt>
             <dd className="text-right font-medium tabular-nums">{value}</dd>
           </div>
         ))}

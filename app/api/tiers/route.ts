@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { clipSeconds, dailyLimit, TIER_INFO } from "@/lib/tiers";
+import { chogMinSetting, clipSeconds, dailyLimit, TIER_INFO } from "@/lib/tiers";
 
 export const dynamic = "force-dynamic";
 
@@ -7,7 +7,10 @@ export const dynamic = "force-dynamic";
 export function GET() {
   return NextResponse.json({
     holder: { ...TIER_INFO.holder, limit: dailyLimit("holder") },
+    token: { ...TIER_INFO.token, limit: dailyLimit("token") },
     free: { ...TIER_INFO.free, limit: dailyLimit("free") },
+    /** Minimum CHOG for the CHOG holder level; null while that level is off. */
+    chogMin: chogMinSetting(),
     clipSeconds: clipSeconds(),
   });
 }
