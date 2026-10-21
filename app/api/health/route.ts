@@ -3,6 +3,7 @@ import { persistent, ping } from "@/lib/store";
 import { PROVIDER } from "@/lib/video";
 import { chogTracked } from "@/lib/standing";
 import { chogMinSetting } from "@/lib/tiers";
+import { swapConfigured, swapOpen } from "@/lib/swap";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ export async function GET() {
       chogContract: Boolean(process.env.CHOG_CONTRACT_ADDRESS),
       chogToken: chogTracked(),
       chogTokenMin: chogMinSetting() !== null,
+      swapConfigured: swapConfigured(),
+      swapOpen: swapOpen(),
       sessionSecret: (process.env.SESSION_SECRET?.length ?? 0) >= 32,
     },
     { status: storeOk ? 200 : 503 },

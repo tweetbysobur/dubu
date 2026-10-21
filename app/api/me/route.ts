@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { getSessionAddress } from "@/lib/session";
-import { getStanding } from "@/lib/standing";
+import { getStanding, monBalance } from "@/lib/standing";
 import { accountAddresses } from "@/lib/links";
 import { dailyLimit, TIER_INFO } from "@/lib/tiers";
 import { getUsed } from "@/lib/limits";
 import { MOCK } from "@/lib/video";
 import { fail } from "@/lib/http";
+import { swapAvailableFor } from "@/lib/swap";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,8 @@ export async function GET() {
   if (!address) return fail(401, "Not signed in.");
 
   let status;
+  // MON is only read for the sign-in wallet: it is the one that can swap. A failed read shows as unknown.
+  const mon = monBalance(address).catch(() => null);
   try {
     status = await getStanding(await accountAddresses(address));
   } catch (e) {
@@ -38,6 +41,8 @@ export async function GET() {
     tokens: status.tokens,
     wallets: status.wallets,
     chog: status.chog,
+    mon: { balance: await mon },
+    swap: swapAvailableFor(address),
     used,
     limit: dailyLimit(tier),
     mock: MOCK,

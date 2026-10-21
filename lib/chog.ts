@@ -89,6 +89,17 @@ async function tokensFromAlchemy(owner: Address): Promise<ChogToken[]> {
   }));
 }
 
+/** Public metadata for any minted Chog Genesis, for the landing page showcase. */
+export async function getChogMeta(tokenId: string): Promise<ChogToken | null> {
+  if (!contract || !TOKEN_ID.test(tokenId)) return null;
+  try {
+    const token = await tokenFromChain(BigInt(tokenId));
+    return token.image ? token : null;
+  } catch {
+    return null; // not minted, or metadata unreachable
+  }
+}
+
 /**
  * Fallback when the wallet's tokens cannot be listed: the holder names a token ID
  * and we only accept it if ownerOf matches the signed-in wallet.

@@ -35,6 +35,12 @@ export function formatChog(amount: string | null | undefined): string {
   return Number.isFinite(n) ? new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(n) : "0";
 }
 
+/** MON amount for display, up to 4 decimals. */
+export function formatMon(amount: string | null | undefined): string {
+  const n = Number(amount ?? 0);
+  return Number.isFinite(n) ? new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(n) : "0";
+}
+
 export type Me = {
   address: string;
   tier: TierId;
@@ -45,6 +51,10 @@ export type Me = {
   /** Sign-in address first, then linked wallets. */
   wallets: { address: string; chogs: number; holder: boolean; chogBalance: string }[];
   chog: { tracked: boolean; balance: string; min: string | null };
+  /** MON in the sign-in wallet; null when it could not be read. */
+  mon: { balance: string | null };
+  /** True when this account can use the MON to CHOG swap. */
+  swap: boolean;
   used: number;
   limit: number;
   mock: boolean;
@@ -57,6 +67,8 @@ export type TierFacts = {
   free: TierFact;
   chogMin: string | null;
   clipSeconds: number | null;
+  /** True when the MON to CHOG swap is open to everyone. */
+  swap: boolean;
 };
 
 export type JobStatus = {

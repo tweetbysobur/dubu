@@ -74,10 +74,24 @@ body {
   animation: shimmer 1.4s linear infinite;
 }
 
+/* Chog showcase reel: two copies of the row slide left by one copy's width. */
+@keyframes dubu-reel {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.dubu-reel {
+  animation: dubu-reel 60s linear infinite;
+}
+.dubu-reel-wrap:hover .dubu-reel,
+.dubu-reel-wrap:focus-within .dubu-reel {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dubu-rec-ring,
   .dubu-star,
-  .skeleton {
+  .skeleton,
+  .dubu-reel {
     animation: none;
   }
 }

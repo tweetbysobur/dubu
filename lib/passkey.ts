@@ -6,9 +6,10 @@
  * Mera turns a passkey's PRF output into a standard EVM account: the PRF output
  * is the entropy of a BIP-39 phrase, and the key sits at m/44'/60'/0'/0/0, the
  * same path MetaMask uses. No backend, no API key, no custody. The key exists
- * only in this tab, only for as long as it takes to sign the login message.
+ * only in this tab, only for as long as it takes to sign.
  *
- * Dubu only ever signs one thing with it: the sign-in message. No transactions.
+ * Dubu signs two things with it: the sign-in message, and a MON to CHOG swap the
+ * user reviews and confirms with a fresh passkey prompt.
  *
  * Passkeys are bound to the relying party ID, which is this site's hostname.
  * Moving Dubu to another domain means passkeys from the old one stop working
@@ -168,5 +169,33 @@ export async function exportPasskeyWallet(expected: string): Promise<WalletExpor
     return { phrase: phrase.split(" "), privateKey };
   } finally {
     prf.fill(0);
+  }
+}
+
+export type PasskeyTx = {
+  to: `0x${string}`;
+  data: `0x${string}`;
+  value: bigint;
+  gas: bigint;
+  nonce: number;
+  maxFeePerGas: bigint;
+  maxPriorityFeePerGas: bigint;
+  chainId: number;
+};
+
+/**
+ * Signs one transaction with the passkey wallet, after a fresh passkey prompt.
+ * Refuses if the passkey opens a different wallet than `expected`. The key is
+ * wiped as soon as the signature exists. Broadcasting is the server's job.
+ */
+export async function signWithPasskey(expected: string, tx: PasskeyTx): Promise<`0x${string}`> {
+  const { account, end } = await openPasskeyWallet();
+  try {
+    if (account.address.toLowerCase() !== expected.toLowerCase()) {
+      throw new Error("That passkey opens a different wallet. Use the passkey for this account. Nothing was signed.");
+    }
+    return await account.signTransaction({ ...tx, type: "eip1559" });
+  } finally {
+    end();
   }
 }

@@ -5,12 +5,14 @@ import { useEffect, useRef, useState } from "react";
 import { useAccount, useDisconnect, useSignMessage } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, formatChog, TIER_NAME, type Me } from "@/lib/api";
+import { api, formatChog, formatMon, TIER_NAME, type Me } from "@/lib/api";
 import { useMe } from "@/lib/useSession";
 import { rememberedPasskey } from "@/lib/passkey";
 import { Alert, Button, Container, Panel, Spinner, buttonClass } from "@/components/ui";
 import { Mascot } from "@/components/Mascot";
 import { ExportWallet } from "@/components/ExportWallet";
+import { Swap } from "@/components/Swap";
+import { TokenIcon } from "@/components/TokenIcon";
 
 const MAX_LINKED = 3;
 
@@ -92,7 +94,13 @@ function Profile({ me }: { me: NonNullable<ReturnType<typeof useMe>["data"]> }) 
   return (
     <main>
       <Container className="max-w-3xl py-8 sm:py-12">
-        <h1 className="font-display text-[34px] font-extrabold leading-tight tracking-[-0.04em] sm:text-5xl">Profile</h1>
+        <div className="flex items-center gap-4">
+          <Avatar me={me} />
+          <div className="min-w-0">
+            <h1 className="font-display text-[34px] font-extrabold leading-tight tracking-[-0.04em] sm:text-5xl">Profile</h1>
+            <p className="text-sm font-medium text-mute">{TIER_NAME[me.tier]}</p>
+          </div>
+        </div>
 
         <Panel className="mt-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -135,11 +143,70 @@ function Profile({ me }: { me: NonNullable<ReturnType<typeof useMe>["data"]> }) 
           </dl>
         </Panel>
 
+        <Balances me={me} />
+
+        {me.swap && <Swap address={me.address} monBalance={me.mon.balance} isPasskey={isPasskey} />}
+
         <LinkedWallets linked={linked} account={me.address} tracked={me.chog.tracked} />
 
         {isPasskey && <ExportWallet address={me.address} />}
       </Container>
     </main>
+  );
+}
+
+/** A Genesis holder's own Chog as their picture, else the Dubu mascot. */
+function Avatar({ me }: { me: Me }) {
+  const [failed, setFailed] = useState(false);
+  const chog = me.tokens[0];
+  if (chog && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={`/api/chogs/${chog.tokenId}/image`}
+        alt={chog.name}
+        className="size-16 shrink-0 rounded-2xl bg-surface object-cover ring-1 ring-line sm:size-20"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <span className="grid size-16 shrink-0 place-items-center rounded-2xl bg-wash sm:size-20">
+      <Mascot mood="idle" size={64} className="h-auto w-12 sm:w-14" />
+    </span>
+  );
+}
+
+/** CHOG across every wallet, MON in the sign-in wallet, with their official marks. */
+function Balances({ me }: { me: Me }) {
+  const mon = me.mon.balance;
+  const funded = mon !== null && Number(mon) > 0;
+  return (
+    <Panel className="mt-6">
+      <h2 className="font-display text-xl font-bold tracking-[-0.02em]">Balances</h2>
+      <ul className="mt-4 divide-y divide-line">
+        {me.chog.tracked && (
+          <li className="flex items-center gap-3 py-3.5">
+            <TokenIcon token="chog" size={40} />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">CHOG</p>
+              <p className="text-sm text-mute">Across your wallets</p>
+            </div>
+            <p className="text-right font-display text-xl font-bold tabular-nums">{formatChog(me.chog.balance)}</p>
+          </li>
+        )}
+        <li className="flex items-center gap-3 py-3.5">
+          <TokenIcon token="mon" size={40} />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">MON</p>
+            <p className="text-sm text-mute">{funded ? "In this wallet" : "Send MON on Monad to the address above"}</p>
+          </div>
+          <p className="text-right font-display text-xl font-bold tabular-nums">
+            {mon === null ? "-" : funded ? formatMon(mon) : "Not funded"}
+          </p>
+        </li>
+      </ul>
+    </Panel>
   );
 }
 

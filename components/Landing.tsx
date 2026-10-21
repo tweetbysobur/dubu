@@ -6,6 +6,7 @@ import { useHeroCtaRef } from "@/lib/heroCta";
 import type { useSession } from "@/lib/useSession";
 import { Mascot, type Mood } from "./Mascot";
 import { Faq } from "./Faq";
+import { ChogReel } from "./ChogReel";
 import { SignIn } from "./SignIn";
 import { Container } from "./ui";
 
@@ -14,6 +15,7 @@ export function Landing({ session }: { session: ReturnType<typeof useSession> })
   return (
     <main>
       <Hero session={session} />
+      <ChogReel />
       <HowItWorks clipSeconds={tiers.data?.clipSeconds ?? null} />
       <Compare tiers={tiers.data} />
       <section id="faq" className="scroll-mt-16">

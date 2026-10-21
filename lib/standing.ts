@@ -58,6 +58,17 @@ export type Standing = {
   };
 };
 
+/** Native MON balance of one wallet, as a decimal string in whole MON. */
+export async function monBalance(address: string): Promise<string> {
+  const demo = (process.env.DEMO_MON_BALANCES || "")
+    .split(",")
+    .map((p) => p.split(":").map((s) => s.trim()))
+    .find(([a, v]) => a?.toLowerCase() === address.toLowerCase() && /^\d+(\.\d+)?$/.test(v ?? ""));
+  if (demo) return demo[1];
+  if (!isAddress(address)) return "0";
+  return formatUnits(await client.getBalance({ address: address as Address }), 18);
+}
+
 /** Everything that decides an account's level: NFTs and CHOG balance across all its wallets. */
 export async function getStanding(addresses: string[]): Promise<Standing> {
   const tracked = chogTracked();
