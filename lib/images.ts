@@ -8,6 +8,7 @@ const ALLOWED_HOSTS = new Set([
   "storage.nadapp.net",
   "raw.githubusercontent.com",
   "ipfs.io",
+  "dweb.link",
   "gateway.pinata.cloud",
   "cloudflare-ipfs.com",
   "nftstorage.link",

@@ -1,4 +1,4 @@
-import { getChogMeta, TOKEN_ID } from "@/lib/chog";
+import { getChogMeta, TOKEN_ID, uriCandidates } from "@/lib/chog";
 import { fetchImage, imageResponse } from "@/lib/images";
 import { clientIp, softBurst } from "@/lib/limits";
 import { fail } from "@/lib/http";
@@ -14,7 +14,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   const meta = await getChogMeta(id);
   if (!meta) return fail(404, "No image for that Chog.");
-  const img = await fetchImage(meta.image).catch(() => null);
-  if (!img) return fail(502, "Could not load that Chog's image.");
-  return imageResponse(img);
+  for (const url of meta.imageUri ? uriCandidates(meta.imageUri) : [meta.image]) {
+    const img = await fetchImage(url).catch(() => null);
+    if (img) return imageResponse(img);
+  }
+  console.error(`[chog] image for #${id} unreachable`);
+  return fail(502, "Could not load that Chog's image.");
 }

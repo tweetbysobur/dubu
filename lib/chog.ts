@@ -2,7 +2,7 @@ import { createPublicClient, http, parseAbi, isAddress, type Address } from "vie
 import { activeChain } from "./chain";
 
 export type Trait = { trait_type: string; value: string };
-export type ChogToken = { tokenId: string; name: string; image: string; traits: Trait[]; owner?: string };
+export type ChogToken = { tokenId: string; name: string; image: string; traits: Trait[]; owner?: string; imageUri?: string };
 export type HolderStatus = { holder: boolean; tokens: ChogToken[] };
 
 const abi = parseAbi([
@@ -35,15 +35,33 @@ export function resolveUri(uri: string) {
   return uri;
 }
 
+/** Public gateways tried in order when the main one fails. */
+const FALLBACK_GATEWAYS = ["https://dweb.link", "https://gateway.pinata.cloud"];
+
+/** Every URL to try for a URI: the configured gateway first, then the fallbacks for IPFS. */
+export function uriCandidates(uri: string): string[] {
+  if (!uri.startsWith("ipfs://")) return [resolveUri(uri)];
+  const path = uri.slice(7).replace(/^ipfs\//, "");
+  return [gateway, ...FALLBACK_GATEWAYS.filter((g) => g !== gateway)].map((g) => `${g}/ipfs/${path}`);
+}
+
 async function readMetadata(uri: string): Promise<Record<string, unknown>> {
   if (uri.startsWith("data:application/json")) {
     const [, body] = uri.split(",");
     const json = uri.includes(";base64,") ? Buffer.from(body, "base64").toString() : decodeURIComponent(body);
     return JSON.parse(json);
   }
-  const res = await fetch(resolveUri(uri), { next: { revalidate: 3600 } });
-  if (!res.ok) throw new Error(`metadata ${res.status}`);
-  return res.json();
+  let last = "";
+  for (const url of uriCandidates(uri)) {
+    try {
+      const res = await fetch(url, { next: { revalidate: 3600 }, signal: AbortSignal.timeout(8_000) });
+      if (res.ok) return await res.json();
+      last = `metadata ${res.status} from ${new URL(url).hostname}`;
+    } catch (e) {
+      last = `metadata fetch failed from ${new URL(url).hostname}: ${e instanceof Error ? e.message : e}`;
+    }
+  }
+  throw new Error(last);
 }
 
 function toTraits(raw: unknown): Trait[] {
@@ -60,6 +78,7 @@ async function tokenFromChain(tokenId: bigint): Promise<ChogToken> {
     tokenId: tokenId.toString(),
     name: String(meta.name ?? `Chog #${tokenId}`),
     image: resolveUri(String(meta.image ?? meta.image_url ?? "")),
+    imageUri: String(meta.image ?? meta.image_url ?? ""),
     traits: toTraits(meta.attributes),
   };
 }
@@ -95,7 +114,8 @@ export async function getChogMeta(tokenId: string): Promise<ChogToken | null> {
   try {
     const token = await tokenFromChain(BigInt(tokenId));
     return token.image ? token : null;
-  } catch {
+  } catch (e) {
+    console.error(`[chog] metadata for #${tokenId} failed`, e instanceof Error ? e.message : e);
     return null; // not minted, or metadata unreachable
   }
 }
