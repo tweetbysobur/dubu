@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import type { useSession } from "@/lib/useSession";
+import { useAccount } from "wagmi";
+import { markWalletSignInIntent, type useSession } from "@/lib/useSession";
 import { passkeySupported, rememberedPasskey } from "@/lib/passkey";
 import { Alert, buttonClass, Spinner } from "./ui";
 
@@ -15,6 +16,7 @@ function shortAddress(a: string) {
 /** Passkey first, wallet second. Browser-only facts are read after mount. */
 export function SignIn({ session }: { session: Session }) {
   const { passkey, walletSignIn } = session;
+  const { isConnected } = useAccount();
   const [env, setEnv] = useState<{ supported: boolean; remembered: string | null } | null>(null);
 
   useEffect(() => {
@@ -29,7 +31,12 @@ export function SignIn({ session }: { session: Session }) {
       {({ openConnectModal, mounted }) => (
         <button
           type="button"
-          onClick={openConnectModal}
+          onClick={() => {
+            markWalletSignInIntent();
+            // Already connected (for example from linking earlier): go straight to the signature.
+            if (isConnected) walletSignIn.mutate();
+            else openConnectModal();
+          }}
           disabled={!mounted || busy}
           className={`${buttonClass(variant, "lg")} w-full sm:w-auto`}
         >

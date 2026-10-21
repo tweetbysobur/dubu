@@ -1,10 +1,36 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { useAccount, useDisconnect, useSignMessage } from "wagmi";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, type Me } from "./api";
 import { createPasskeyWallet, forgetPasskey, openPasskeyWallet, passkeyErrorMessage } from "./passkey";
+
+/**
+ * Wallet sign-in only starts when the person asked for it on the sign-in
+ * screen. A wallet that is merely connected (left over from linking, or
+ * remembered by the browser) never signs in on its own, so it can never
+ * replace a passkey account without the person choosing it.
+ */
+let walletIntent = false;
+const intentListeners = new Set<() => void>();
+function setWalletIntent(v: boolean) {
+  walletIntent = v;
+  intentListeners.forEach((l) => l());
+}
+export function markWalletSignInIntent() {
+  setWalletIntent(true);
+}
+function useWalletIntent() {
+  return useSyncExternalStore(
+    (l) => {
+      intentListeners.add(l);
+      return () => intentListeners.delete(l);
+    },
+    () => walletIntent,
+    () => false,
+  );
+}
 
 async function signInWith(address: string, sign: (message: string) => Promise<string>) {
   const { message } = await api<{ message: string }>(`/api/auth/nonce?address=${address}`);
@@ -92,11 +118,13 @@ export function useSession() {
       });
     },
     onSuccess: done,
+    onSettled: () => setWalletIntent(false),
   });
 
-  // A wallet connected with no session yet: ask it to sign right away, once per address.
+  // The person chose a wallet on the sign-in screen and it is now connected: ask it to sign, once per address.
+  const intent = useWalletIntent();
   const autoTried = useRef<string | null>(null);
-  const needsWalletSig = isConnected && !!walletAddress && me.data === null;
+  const needsWalletSig = isConnected && !!walletAddress && me.data === null && (intent || walletSignIn.isPending);
   useEffect(() => {
     if (!needsWalletSig || walletSignIn.isPending || autoTried.current === walletAddress) return;
     autoTried.current = walletAddress!;

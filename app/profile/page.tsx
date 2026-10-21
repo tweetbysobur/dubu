@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAccount, useDisconnect, useSignMessage } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, formatChog, formatMon, type Me } from "@/lib/api";
+import { api, formatChog, formatMon, TIER_NAME, type Me } from "@/lib/api";
 import { useMe } from "@/lib/useSession";
 import { rememberedPasskey } from "@/lib/passkey";
 import { Alert, Button, Container, Panel, Spinner, buttonClass } from "@/components/ui";
@@ -13,7 +13,8 @@ import { Mascot } from "@/components/Mascot";
 import { ExportWallet } from "@/components/ExportWallet";
 import { Swap } from "@/components/Swap";
 import { TokenIcon } from "@/components/TokenIcon";
-import { LevelBadge } from "@/components/LevelBadge";
+import { LevelBadge, LevelMark } from "@/components/LevelBadge";
+import { notify } from "@/lib/notify";
 
 const MAX_LINKED = 3;
 
@@ -107,7 +108,7 @@ function Profile({ me }: { me: Me }) {
 
         {me.swap && <Swap address={me.address} monBalance={me.mon.balance} isPasskey={isPasskey} />}
 
-        <LinkedWallets linked={linked} account={me.address} tracked={me.chog.tracked} />
+        <LinkedWallets linked={linked} account={me.address} tracked={me.chog.tracked} tier={me.tier} />
 
         {isPasskey && <ExportWallet address={me.address} />}
       </Container>
@@ -265,17 +266,19 @@ function LinkedWallets({
   linked,
   account,
   tracked,
+  tier,
 }: {
   linked: { address: string; chogs: number; holder: boolean; chogBalance: string }[];
   account: string;
   tracked: boolean;
+  tier: Me["tier"];
 }) {
   const qc = useQueryClient();
   const { address: connected, isConnected } = useAccount();
-  const { openConnectModal } = useConnectModal();
+  const { openConnectModal, connectModalOpen } = useConnectModal();
   const { signMessageAsync } = useSignMessage();
   const { disconnect } = useDisconnect();
-  const [notice, setNotice] = useState<string | null>(null);
+  const [phase, setPhase] = useState<"connect" | "sign" | null>(null);
   const wantLink = useRef(false);
 
   const link = useMutation({
@@ -283,6 +286,7 @@ function LinkedWallets({
       if (wallet.toLowerCase() === account.toLowerCase()) {
         throw new Error("That is the wallet you signed in with. Switch to another wallet to link it.");
       }
+      setPhase("sign");
       const { message } = await api<{ message: string }>(`/api/links/nonce?address=${wallet}`);
       let signature: string;
       try {
@@ -291,22 +295,34 @@ function LinkedWallets({
         throw new Error("The signature was cancelled. Nothing was linked.");
       }
       await api("/api/links", { method: "POST", body: JSON.stringify({ address: wallet, signature }) });
-      return wallet;
+      return { wallet, me: await api<Me>("/api/me") };
     },
-    onSuccess: (wallet) => {
-      setNotice(`Linked ${short(wallet)}.`);
-      qc.invalidateQueries({ queryKey: ["me"] });
+    onSuccess: ({ wallet, me }) => {
+      qc.setQueryData(["me"], me);
+      const upgraded = me.tier !== tier && me.tier !== "free";
+      notify({
+        tone: "celebrate",
+        title: upgraded ? `${TIER_NAME[me.tier]} unlocked` : "Wallet linked",
+        body: upgraded
+          ? `${short(wallet.toLowerCase())} is linked. Your level is now ${TIER_NAME[me.tier]}.`
+          : `${short(wallet.toLowerCase())} now counts toward your level.`,
+      });
       disconnect(); // the passkey session stays; the wallet was only needed to sign
+    },
+    onError: () => {
+      // Never leave the other wallet connected: it is only here to sign the link message.
+      disconnect();
     },
     onSettled: () => {
       wantLink.current = false;
+      setPhase(null);
     },
   });
 
   const unlink = useMutation({
     mutationFn: (wallet: string) => api("/api/links", { method: "DELETE", body: JSON.stringify({ address: wallet }) }),
     onSuccess: (_d, wallet) => {
-      setNotice(`Unlinked ${short(wallet)}.`);
+      notify({ tone: "info", title: "Wallet unlinked", body: `${short(wallet)} no longer counts toward your level.` });
       qc.invalidateQueries({ queryKey: ["me"] });
     },
   });
@@ -319,58 +335,122 @@ function LinkedWallets({
     }
   }, [isConnected, connected, link]);
 
+  // The modal closed without a wallet: back to the start.
+  useEffect(() => {
+    if (!connectModalOpen && phase === "connect" && !isConnected) {
+      const t = setTimeout(() => {
+        if (wantLink.current) {
+          wantLink.current = false;
+          setPhase(null);
+        }
+      }, 400);
+      return () => clearTimeout(t);
+    }
+  }, [connectModalOpen, phase, isConnected]);
+
   function start() {
-    setNotice(null);
     link.reset();
     if (isConnected && connected) {
       link.mutate(connected);
     } else {
       wantLink.current = true;
+      setPhase("connect");
       openConnectModal?.();
     }
   }
 
   const full = linked.length >= MAX_LINKED;
+  const steps: { key: "connect" | "sign" | "done"; label: string }[] = [
+    { key: "connect", label: "Connect the wallet" },
+    { key: "sign", label: "Sign one message" },
+    { key: "done", label: "It counts toward your level" },
+  ];
+  const activeIndex = phase === "connect" ? 0 : phase === "sign" ? 1 : -1;
 
   return (
     <Panel className="mt-6">
-      <h2 className="font-display text-xl font-bold tracking-[-0.02em]">Linked wallets</h2>
-      <p className="mt-1 max-w-[36rem] text-sm leading-relaxed text-mute">
-        Link the wallets that hold your Chog Genesis or CHOG. Dubu counts them all toward your level. You sign one message
-        per wallet to prove it is yours. Nothing moves and there is no gas.
-      </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="font-display text-xl font-bold tracking-[-0.02em]">Linked wallets</h2>
+          <p className="mt-1 max-w-[34rem] text-sm leading-relaxed text-mute">
+            Hold your Chog Genesis or CHOG in another wallet? Link it and Dubu counts it toward your level. You stay
+            signed in with this account. Nothing moves and there is no gas.
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-surface px-3 py-1 text-sm font-semibold tabular-nums text-mute">
+          {linked.length} of {MAX_LINKED}
+        </span>
+      </div>
 
-      {linked.length > 0 ? (
-        <ul className="mt-5 divide-y divide-line border-y border-line">
-          {linked.map((w) => (
-            <li key={w.address} className="flex flex-wrap items-center justify-between gap-3 py-3.5">
-              <div className="min-w-0">
-                <p className="font-semibold tabular-nums">{short(w.address)}</p>
-                <Holdings chogs={w.chogs} holder={w.holder} balance={w.chogBalance} tracked={tracked} />
-              </div>
-              <Button
-                variant="ghost"
-                loading={unlink.isPending && unlink.variables === w.address}
-                disabled={unlink.isPending}
-                onClick={() => unlink.mutate(w.address)}
-              >
-                Unlink
-              </Button>
-            </li>
-          ))}
+      {linked.length > 0 && (
+        <ul className="mt-5 space-y-2">
+          {linked.map((w) => {
+            const chog = Number(w.chogBalance) > 0;
+            return (
+              <li key={w.address} className="flex items-center gap-3 rounded-2xl border border-line p-3 sm:p-4">
+                <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-surface">
+                  {w.holder ? (
+                    <LevelMark tier="holder" size={28} />
+                  ) : chog ? (
+                    <TokenIcon token="chog" size={28} />
+                  ) : (
+                    <svg aria-hidden width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4A5568" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM16 12h.01M4 9h16" />
+                    </svg>
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold tabular-nums">{short(w.address)}</p>
+                  <Holdings chogs={w.chogs} holder={w.holder} balance={w.chogBalance} tracked={tracked} />
+                </div>
+                <Button
+                  variant="ghost"
+                  loading={unlink.isPending && unlink.variables === w.address}
+                  disabled={unlink.isPending}
+                  onClick={() => unlink.mutate(w.address)}
+                  aria-label={`Unlink ${short(w.address)}`}
+                >
+                  Unlink
+                </Button>
+              </li>
+            );
+          })}
         </ul>
-      ) : (
-        <p className="mt-5 rounded-2xl border border-dashed border-line px-4 py-5 text-center text-sm text-mute">
-          No linked wallets yet.
-        </p>
       )}
 
-      <div className="mt-5">
-        <Button size="lg" className="w-full sm:w-auto" disabled={full || link.isPending} onClick={start}>
+      <ol className="mt-5 grid gap-2 sm:grid-cols-3" aria-label="How linking works">
+        {steps.map((st, i) => {
+          const active = i === activeIndex;
+          const doneStep = activeIndex > i;
+          return (
+            <li
+              key={st.key}
+              aria-current={active ? "step" : undefined}
+              className={`flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm font-medium ${active ? "bg-wash text-brand" : "bg-surface text-mute"}`}
+            >
+              <span
+                className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-bold tabular-nums ${active || doneStep ? "bg-brand text-white" : "bg-white text-mute ring-1 ring-line"}`}
+              >
+                {active ? <Spinner className="size-3" /> : i + 1}
+              </span>
+              {st.label}
+            </li>
+          );
+        })}
+      </ol>
+
+      <div className="mt-4">
+        <Button size="lg" className="w-full sm:w-auto" disabled={full || link.isPending || phase === "connect"} onClick={start}>
           {link.isPending ? (
             <>
               <Spinner /> Confirm in your wallet
             </>
+          ) : phase === "connect" ? (
+            <>
+              <Spinner /> Choose a wallet
+            </>
+          ) : linked.length ? (
+            "Link another wallet"
           ) : (
             "Link a wallet"
           )}
@@ -381,11 +461,6 @@ function LinkedWallets({
       {(link.error || unlink.error) && (
         <div className="mt-4">
           <Alert>{(link.error ?? unlink.error)!.message}</Alert>
-        </div>
-      )}
-      {notice && !link.error && (
-        <div className="mt-4">
-          <Alert tone="info">{notice}</Alert>
         </div>
       )}
     </Panel>
