@@ -62,7 +62,13 @@ export default function ResultPage() {
   return (
     <main>
       <Container className="max-w-3xl py-8 sm:py-12">
-        <Link href="/" className="text-sm font-medium text-mute hover:text-ink">
+        <Link
+          href="/"
+          className="-ml-2 inline-flex h-11 items-center gap-1.5 rounded-xl px-2 text-[15px] font-medium text-mute hover:bg-surface hover:text-ink"
+        >
+          <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
           Back to studio
         </Link>
 

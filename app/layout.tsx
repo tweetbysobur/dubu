@@ -18,7 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-dvh bg-white font-sans text-ink">
         <Providers>
           <Header />
-          {children}
+          <div id="main" tabIndex={-1} className="outline-none">
+            {children}
+          </div>
         </Providers>
       </body>
     </html>

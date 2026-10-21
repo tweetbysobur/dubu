@@ -3,6 +3,7 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useQuery } from "@tanstack/react-query";
 import { api, type TierFacts } from "@/lib/api";
+import { useHeroCtaRef } from "@/lib/heroCta";
 import { Mascot, type Mood } from "./Mascot";
 import { Logo } from "./Logo";
 import { buttonClass, Container } from "./ui";
@@ -34,6 +35,7 @@ function Viewfinder({ children }: { children: React.ReactNode }) {
 }
 
 function Hero() {
+  const ctaRef = useHeroCtaRef<HTMLDivElement>();
   return (
     <section className="border-b border-line">
       <Container className="grid items-center gap-6 py-10 sm:py-16 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] md:gap-6 md:py-24">
@@ -52,7 +54,7 @@ function Hero() {
             Upload an image and describe a scene. Dubu turns it into a short video you can download. Chog Genesis
             holders get their own Chog loaded in, sharper video and no watermark.
           </p>
-          <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
+          <div ref={ctaRef} className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
             <ConnectButton.Custom>
               {({ openConnectModal, mounted }) => (
                 <button
@@ -93,7 +95,7 @@ function HowItWorks({ clipSeconds }: { clipSeconds: number | null }) {
   ];
 
   return (
-    <section>
+    <section id="how-it-works" className="scroll-mt-16">
       <Container className="py-16 sm:py-24">
         <h2 className="font-display text-[34px] font-extrabold leading-tight tracking-[-0.035em] sm:text-[44px]">
           How it works
@@ -132,7 +134,7 @@ function Compare({ tiers }: { tiers?: TierFacts }) {
   ];
 
   return (
-    <section className="bg-surface">
+    <section id="holders" className="scroll-mt-16 bg-surface">
       <Container className="py-16 sm:py-24">
         <h2 className="font-display text-[34px] font-extrabold leading-tight tracking-[-0.035em] sm:text-[44px]">
           Holders get the full studio
