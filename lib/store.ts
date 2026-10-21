@@ -1,8 +1,22 @@
 // Counter store. Uses Upstash Redis (REST) when configured, so limits hold across
 // serverless instances. Falls back to process memory for local dev.
-// Vercel Marketplace's Upstash integration sets KV_REST_API_URL and KV_REST_API_TOKEN.
-const URL_ = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+// Vercel Marketplace's Upstash integration sets KV_REST_API_URL and KV_REST_API_TOKEN,
+// optionally behind a custom prefix (e.g. STORAGE_KV_REST_API_URL). Any prefix is accepted.
+function findRedisEnv(): { url?: string; token?: string } {
+  const env = process.env;
+  if (env.KV_REST_API_URL && env.KV_REST_API_TOKEN) return { url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN };
+  if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
+    return { url: env.UPSTASH_REDIS_REST_URL, token: env.UPSTASH_REDIS_REST_TOKEN };
+  }
+  for (const key of Object.keys(env).sort()) {
+    const m = key.match(/^(.+_)KV_REST_API_URL$/);
+    const token = m && env[`${m[1]}KV_REST_API_TOKEN`];
+    if (m && env[key] && token) return { url: env[key], token };
+  }
+  return {};
+}
+
+const { url: URL_, token: TOKEN } = findRedisEnv();
 
 export const persistent = Boolean(URL_ && TOKEN);
 
@@ -59,6 +73,17 @@ export async function decr(key: string): Promise<void> {
   }
   const e = mem.get(key);
   if (e) e.v = Math.max(0, e.v - 1);
+}
+
+/** True when the store answers. Memory mode always answers. */
+export async function ping(): Promise<boolean> {
+  if (!persistent) return true;
+  try {
+    const [r] = await pipeline([["PING"]]);
+    return r === "PONG";
+  } catch {
+    return false;
+  }
 }
 
 export async function getCount(key: string): Promise<number> {
