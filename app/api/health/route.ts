@@ -3,7 +3,7 @@ import { persistent, ping } from "@/lib/store";
 import { PROVIDER } from "@/lib/video";
 import { chogTracked } from "@/lib/standing";
 import { chogMinSetting } from "@/lib/tiers";
-import { payaiEnabled, swapConfigured, swapOpen } from "@/lib/swap";
+import { swapConfigured, swapOpen } from "@/lib/swap";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,6 @@ export async function GET() {
       chogTokenMin: chogMinSetting() !== null,
       swapConfigured: swapConfigured(),
       swapOpen: swapOpen(),
-      swapViaPayai: payaiEnabled(),
       sessionSecret: (process.env.SESSION_SECRET?.length ?? 0) >= 32,
     },
     { status: storeOk ? 200 : 503 },

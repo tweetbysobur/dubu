@@ -7,7 +7,6 @@ import {
   parseAbi,
   parseEventLogs,
   parseTransaction,
-  parseUnits,
   recoverTransactionAddress,
   type Address,
   type Hex,
@@ -17,10 +16,6 @@ import { client } from "./chog";
 
 /**
  * MON to CHOG, nothing else.
- *
- * With PAYAI_PARTNER_URL and PAYAI_PARTNER_KEY set, PayAI's partner swap API
- * quotes and builds the call, and Dubu checks it like any other. Without them,
- * or when PayAI is unreachable, Dubu routes directly. Either way:
  *
  * Two venues, quoted side by side, best output wins:
  * - Nad.fun: its Lens returns a quote and the router that quote is valid for
@@ -261,75 +256,8 @@ function toQuote(r: { best: Route; nad: Route | null; uni: Route | null }, amoun
 }
 
 export async function quote(amountIn: bigint, slippageBps: number): Promise<Quote> {
-  const viaPayai = await payai<PayaiQuote>("quote", amountIn, slippageBps);
-  if (viaPayai) {
-    const d = await decimals();
-    return {
-      venue: viaPayai.venue,
-      amountIn: formatEther(amountIn),
-      amountOut: viaPayai.amountOut,
-      minOut: formatUnits(minOut(parseUnits(viaPayai.amountOut, d), slippageBps), d),
-      slippageBps,
-      impact: parseImpact(viaPayai.priceImpact),
-      venues: viaPayai.venues,
-    };
-  }
   const [r, d] = await Promise.all([routeOrThrow(amountIn), decimals()]);
   return toQuote(r, amountIn, slippageBps, d);
-}
-
-// ---------------------------------------------------------------------------
-// PayAI partner API. When PAYAI_PARTNER_URL and PAYAI_PARTNER_KEY are set,
-// quotes and swap calls come from PayAI's swap engine. Dubu still checks every
-// call itself (checkCall) before showing or broadcasting it, and falls back to
-// its own direct route when PayAI is unreachable.
-
-type PayaiQuote = {
-  venue: Venue;
-  amountOut: string;
-  priceImpact: string | null;
-  venues: Record<Venue, string | null>;
-};
-type PayaiBuild = { venue: Venue; amountOut: string; priceImpact: string | null; tx: { to: string; data: Hex; value: string } };
-
-export function payaiEnabled() {
-  return !!(process.env.PAYAI_PARTNER_URL?.trim() && process.env.PAYAI_PARTNER_KEY?.trim());
-}
-
-function parseImpact(s: string | null | undefined): number | null {
-  const n = s ? parseFloat(s) : NaN;
-  return Number.isFinite(n) ? n / 100 : null;
-}
-
-/** Calls PayAI. Returns null when PayAI is off or unreachable, so Dubu falls back. Throws PayAI's own 4xx message. */
-async function payai<T>(kind: "quote" | "build", amountIn: bigint, slippageBps: number, wallet?: string): Promise<T | null> {
-  if (!payaiEnabled() || !cfg.chog) return null;
-  const url = `${process.env.PAYAI_PARTNER_URL!.trim().replace(/\/$/, "")}/api/partner/swap/${kind}`;
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${process.env.PAYAI_PARTNER_KEY!.trim()}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ token: cfg.chog, amountMon: formatEther(amountIn), slippageBps, ...(wallet ? { wallet } : {}) }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(10_000),
-    });
-  } catch (e) {
-    console.error(`[swap] PayAI ${kind} unreachable, using direct route`, e instanceof Error ? e.message : e);
-    return null;
-  }
-  const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string } & T;
-  if (res.ok && data.ok) return data;
-  // A clear answer about this swap (no route, too much impact) is shown as is.
-  if (res.status === 400 || res.status === 404) throw new SwapError(data.message || "No route to CHOG for that amount right now.");
-  console.error(`[swap] PayAI ${kind} answered ${res.status}, using direct route`, data.message);
-  return null;
-}
-
-/** The minimum a checked swap call guarantees, read from the call itself. */
-function minOutOf(to: string, data: Hex): bigint {
-  if (nadRouters().has(to.toLowerCase())) return decodeFunctionData({ abi: NAD_ROUTER_ABI, data }).args[0].amountOutMin;
-  return decodeFunctionData({ abi: UNI_ROUTER_ABI, data }).args[0].amountOutMinimum;
 }
 
 export type UnsignedSwap = {
@@ -345,25 +273,6 @@ export type UnsignedSwap = {
 
 /** Re-quotes, then builds the swap call with `from` as the only recipient and checks it would go through. */
 export async function buildSwap(from: Address, amountIn: bigint, slippageBps: number) {
-  const viaPayai = await payai<PayaiBuild>("build", amountIn, slippageBps, from);
-  if (viaPayai) {
-    const to = viaPayai.tx.to as Address;
-    const data = viaPayai.tx.data;
-    checkCall(to, data, from); // PayAI's call gets the same check as any signed swap
-    if (BigInt(viaPayai.tx.value) !== amountIn) throw new SwapError("The swap amount came back different. Nothing was prepared.");
-    const d = await decimals();
-    const q: Quote = {
-      venue: viaPayai.venue,
-      amountIn: formatEther(amountIn),
-      amountOut: viaPayai.amountOut,
-      minOut: formatUnits(minOutOf(to, data), d),
-      slippageBps,
-      impact: parseImpact(viaPayai.priceImpact),
-      venues: { nadfun: null, uniswap: null, [viaPayai.venue]: viaPayai.amountOut },
-    };
-    return packageSwap(from, to, data, amountIn, q);
-  }
-
   const [r, d] = await Promise.all([routeOrThrow(amountIn), decimals()]);
   const best = r.best;
   const floor = minOut(best.amountOut, slippageBps);
@@ -392,11 +301,7 @@ export async function buildSwap(from: Address, amountIn: bigint, slippageBps: nu
           ],
         });
   checkCall(best.router, data, from); // the same check every signed swap gets
-  return packageSwap(from, best.router, data, amountIn, toQuote(r, amountIn, slippageBps, d));
-}
 
-/** Adds what signing needs (gas, fees, nonce) and checks the swap would go through. */
-async function packageSwap(from: Address, to: Address, data: Hex, amountIn: bigint, q: Quote) {
   const [balance, fees, nonce] = await Promise.all([
     client.getBalance({ address: from }),
     client.estimateFeesPerGas(),
@@ -406,7 +311,7 @@ async function packageSwap(from: Address, to: Address, data: Hex, amountIn: bigi
 
   let gas: bigint;
   try {
-    gas = await client.estimateGas({ account: from, to, data, value: amountIn });
+    gas = await client.estimateGas({ account: from, to: best.router, data, value: amountIn });
   } catch (e) {
     console.error("[swap] simulation failed", e);
     throw new SwapError("The swap would fail right now. Try a smaller amount or a higher slippage.");
@@ -418,7 +323,7 @@ async function packageSwap(from: Address, to: Address, data: Hex, amountIn: bigi
   }
 
   const tx: UnsignedSwap = {
-    to,
+    to: best.router,
     data,
     value: amountIn.toString(),
     gas: gas.toString(),
@@ -427,7 +332,7 @@ async function packageSwap(from: Address, to: Address, data: Hex, amountIn: bigi
     maxPriorityFeePerGas: fees.maxPriorityFeePerGas.toString(),
     chainId: activeChain.id,
   };
-  return { tx, quote: q, networkFee: formatEther(gas * fees.maxFeePerGas) };
+  return { tx, quote: toQuote(r, amountIn, slippageBps, d), networkFee: formatEther(gas * fees.maxFeePerGas) };
 }
 
 /**
