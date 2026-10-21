@@ -93,3 +93,62 @@ export async function getCount(key: string): Promise<number> {
   }
   return memGet(key);
 }
+
+// ---------- sets and claims (linked wallets) ----------
+
+const g2 = globalThis as unknown as { __dubuSets?: Map<string, Set<string>>; __dubuStr?: Map<string, string> };
+const memSets = (g2.__dubuSets ??= new Map<string, Set<string>>());
+const memStr = (g2.__dubuStr ??= new Map<string, string>());
+
+export async function setMembers(key: string): Promise<string[]> {
+  if (persistent) {
+    const [r] = await pipeline([["SMEMBERS", key]]);
+    return Array.isArray(r) ? r.map(String) : [];
+  }
+  return [...(memSets.get(key) ?? [])];
+}
+
+export async function setAdd(key: string, value: string): Promise<void> {
+  if (persistent) {
+    await pipeline([["SADD", key, value]]);
+    return;
+  }
+  const s = memSets.get(key) ?? new Set<string>();
+  s.add(value);
+  memSets.set(key, s);
+}
+
+export async function setRemove(key: string, value: string): Promise<void> {
+  if (persistent) {
+    await pipeline([["SREM", key, value]]);
+    return;
+  }
+  memSets.get(key)?.delete(value);
+}
+
+/** Sets a string only if the key is free. Returns true when this call took it. */
+export async function claim(key: string, value: string): Promise<boolean> {
+  if (persistent) {
+    const [r] = await pipeline([["SET", key, value, "NX"]]);
+    return r === "OK";
+  }
+  if (memStr.has(key)) return false;
+  memStr.set(key, value);
+  return true;
+}
+
+export async function readString(key: string): Promise<string | null> {
+  if (persistent) {
+    const [r] = await pipeline([["GET", key]]);
+    return typeof r === "string" ? r : null;
+  }
+  return memStr.get(key) ?? null;
+}
+
+export async function remove(key: string): Promise<void> {
+  if (persistent) {
+    await pipeline([["DEL", key]]);
+    return;
+  }
+  memStr.delete(key);
+}

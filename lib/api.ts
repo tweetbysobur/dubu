@@ -27,7 +27,9 @@ export type Me = {
   label: string;
   quality: string;
   watermark: boolean;
-  tokens: { tokenId: string; name: string; image: string; traits: { trait_type: string; value: string }[] }[];
+  tokens: { tokenId: string; name: string; image: string; traits: { trait_type: string; value: string }[]; owner?: string }[];
+  /** Sign-in address first, then linked wallets. */
+  wallets: { address: string; chogs: number; holder: boolean }[];
   used: number;
   limit: number;
   mock: boolean;

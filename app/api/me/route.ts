@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionAddress } from "@/lib/session";
-import { getHolderStatus } from "@/lib/chog";
+import { getAccountHolderStatus } from "@/lib/chog";
+import { accountAddresses } from "@/lib/links";
 import { dailyLimit, TIER_INFO } from "@/lib/tiers";
 import { getUsed } from "@/lib/limits";
 import { MOCK } from "@/lib/video";
@@ -15,7 +16,7 @@ export async function GET() {
 
   let status;
   try {
-    status = await getHolderStatus(address);
+    status = await getAccountHolderStatus(await accountAddresses(address));
   } catch (e) {
     console.error("[me] ownership check failed", e);
     return fail(502, "Could not reach Monad to check your Chog. Try again.");
@@ -35,6 +36,7 @@ export async function GET() {
     tier,
     ...TIER_INFO[tier],
     tokens: status.tokens,
+    wallets: status.perWallet,
     used,
     limit: dailyLimit(tier),
     mock: MOCK,

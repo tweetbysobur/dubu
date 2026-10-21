@@ -4,6 +4,7 @@ import "@fontsource-variable/bricolage-grotesque";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 
 export const metadata: Metadata = {
   title: "Dubu: turn your Chog into a video",
@@ -15,12 +16,13 @@ export const viewport: Viewport = { themeColor: "#ffffff" };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-dvh bg-white font-sans text-ink">
+      <body className="flex min-h-dvh flex-col bg-white font-sans text-ink">
         <Providers>
           <Header />
-          <div id="main" tabIndex={-1} className="outline-none">
+          <div id="main" tabIndex={-1} className="flex-1 outline-none">
             {children}
           </div>
+          <Footer />
         </Providers>
       </body>
     </html>

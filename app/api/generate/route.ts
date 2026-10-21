@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionAddress } from "@/lib/session";
-import { getHolderStatus, getOwnedToken, type ChogToken } from "@/lib/chog";
+import { getAccountHolderStatus, getOwnedTokenAny, type ChogToken } from "@/lib/chog";
+import { accountAddresses } from "@/lib/links";
 import { dailyLimit, type Tier } from "@/lib/tiers";
 import {
   allowBurst,
@@ -49,8 +50,10 @@ export async function POST(req: Request) {
 
   // Ownership is re-checked on every generation. The client never decides the tier.
   let status;
+  let addresses: string[];
   try {
-    status = await getHolderStatus(address);
+    addresses = await accountAddresses(address);
+    status = await getAccountHolderStatus(addresses);
   } catch (e) {
     console.error("[generate] ownership check failed", e);
     return fail(502, "Could not verify your Chog right now. Try again.");
@@ -77,12 +80,12 @@ export async function POST(req: Request) {
     let token = status.tokens.find((t) => t.tokenId === id) ?? null;
     if (!token) {
       try {
-        token = await getOwnedToken(address, id);
+        token = await getOwnedTokenAny(addresses, id);
       } catch {
         return fail(502, "Could not load your Chog's metadata. Try again.");
       }
     }
-    if (!token) return fail(403, "That Chog is not in your wallet.");
+    if (!token) return fail(403, "That Chog is not in your wallets.");
     image = token.image;
     finalPrompt = holderPrompt(prompt, token);
   } else {

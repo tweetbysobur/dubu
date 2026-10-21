@@ -41,6 +41,22 @@ export function signInMessage(address: string, nonce: string, host: string) {
   ].join("\n");
 }
 
+export const LINK_NONCE_COOKIE = "dubu_link_nonce";
+
+/** Deliberately different from the sign-in message, so neither signature works as the other. */
+export function linkMessage(account: string, wallet: string, nonce: string, host: string) {
+  return [
+    `${host} wants to link a wallet to your Dubu account.`,
+    "",
+    `Wallet to link: ${wallet}`,
+    `Dubu account: ${account}`,
+    "",
+    "Signing proves you own this wallet. It does not sign you in, move funds or cost gas.",
+    "",
+    `Nonce: ${nonce}`,
+  ].join("\n");
+}
+
 export function createSessionToken(address: Address) {
   const exp = Math.floor(Date.now() / 1000) + SESSION_TTL_S;
   const payload = `${address.toLowerCase()}.${exp}`;

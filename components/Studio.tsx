@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -113,7 +114,11 @@ export function Studio({ me }: { me: Me }) {
                 <>
                   <ImageUpload value={upload} onChange={setUpload} />
                   <p className="mt-4 text-sm leading-relaxed text-mute">
-                    Hold a Chog Genesis NFT to skip this step and unlock holder mode.
+                    Hold a Chog Genesis NFT?{" "}
+                    <Link href="/profile" className="font-semibold text-brand hover:text-brand-press">
+                      Link its wallet
+                    </Link>{" "}
+                    to skip this step and unlock holder mode.
                   </p>
                 </>
               )}

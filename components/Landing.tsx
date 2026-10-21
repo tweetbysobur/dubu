@@ -5,7 +5,7 @@ import { api, type TierFacts } from "@/lib/api";
 import { useHeroCtaRef } from "@/lib/heroCta";
 import type { useSession } from "@/lib/useSession";
 import { Mascot, type Mood } from "./Mascot";
-import { Logo } from "./Logo";
+import { Faq } from "./Faq";
 import { SignIn } from "./SignIn";
 import { Container } from "./ui";
 
@@ -16,7 +16,11 @@ export function Landing({ session }: { session: ReturnType<typeof useSession> })
       <Hero session={session} />
       <HowItWorks clipSeconds={tiers.data?.clipSeconds ?? null} />
       <Compare tiers={tiers.data} />
-      <Footer />
+      <section id="faq" className="scroll-mt-16">
+        <Container className="py-16 sm:py-24">
+          <Faq />
+        </Container>
+      </section>
     </main>
   );
 }
@@ -157,16 +161,5 @@ function TierColumn({ title, rows, featured }: { title: string; rows: [string, s
         ))}
       </dl>
     </div>
-  );
-}
-
-function Footer() {
-  return (
-    <footer className="border-t border-line">
-      <Container className="flex flex-wrap items-center justify-between gap-4 py-8">
-        <Logo size="sm" />
-        <p className="text-sm text-mute">Runs on Monad mainnet.</p>
-      </Container>
-    </footer>
   );
 }

@@ -42,6 +42,12 @@ Passkeys are bound to the site's hostname (`dubuai.vercel.app`). Moving to anoth
 
 Mera 0.3 declares an optional peer on `@wagmi/core` v3 for its wagmi connector, which Dubu does not use. An npm `overrides` entry pins that peer to the project's wagmi v2 so the install resolves.
 
+## Linked wallets
+
+From Profile, a signed-in account can link up to 3 more wallets. The wallet being linked signs a link message (worded differently from the sign-in message, so neither signature works as the other). Holder mode counts Chogs across the sign-in wallet and every linked wallet, so a passkey user can link the wallet that holds their Chog instead of signing in with it.
+
+A wallet can be linked to one Dubu account at a time (`SET NX` claim in Redis), so one Chog cannot grant holder mode to many accounts. Unlinking releases it.
+
 ## How it works
 
 1. The user signs in with a passkey, or connects a wallet with RainbowKit on Monad.

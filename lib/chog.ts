@@ -2,7 +2,7 @@ import { createPublicClient, http, parseAbi, isAddress, type Address } from "vie
 import { activeChain } from "./chain";
 
 export type Trait = { trait_type: string; value: string };
-export type ChogToken = { tokenId: string; name: string; image: string; traits: Trait[] };
+export type ChogToken = { tokenId: string; name: string; image: string; traits: Trait[]; owner?: string };
 export type HolderStatus = { holder: boolean; tokens: ChogToken[] };
 
 const abi = parseAbi([
@@ -136,4 +136,29 @@ export async function getHolderStatus(address: string): Promise<HolderStatus> {
     tokens = await tokensFromAlchemy(address).catch(() => []);
   }
   return { holder: true, tokens: tokens.filter((t) => t.image) };
+}
+
+export type AccountHolderStatus = HolderStatus & {
+  /** Chogs found per address, for the profile page. */
+  perWallet: { address: string; chogs: number; holder: boolean }[];
+};
+
+/** Holder status across the sign-in address and every linked wallet. */
+export async function getAccountHolderStatus(addresses: string[]): Promise<AccountHolderStatus> {
+  const results = await Promise.all(addresses.map((a) => getHolderStatus(a)));
+  const tokens: ChogToken[] = [];
+  const perWallet = results.map((r, i) => {
+    for (const t of r.tokens) tokens.push({ ...t, owner: addresses[i].toLowerCase() });
+    return { address: addresses[i].toLowerCase(), chogs: r.tokens.length, holder: r.holder };
+  });
+  return { holder: results.some((r) => r.holder), tokens, perWallet };
+}
+
+/** Finds a Chog by ID owned by any of the account's addresses. */
+export async function getOwnedTokenAny(addresses: string[], tokenId: string): Promise<ChogToken | null> {
+  for (const a of addresses) {
+    const t = await getOwnedToken(a, tokenId);
+    if (t) return { ...t, owner: a.toLowerCase() };
+  }
+  return null;
 }

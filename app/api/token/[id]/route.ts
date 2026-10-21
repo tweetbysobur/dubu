@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionAddress } from "@/lib/session";
-import { getOwnedToken, TOKEN_ID } from "@/lib/chog";
+import { getOwnedTokenAny, TOKEN_ID } from "@/lib/chog";
+import { accountAddresses } from "@/lib/links";
 import { softBurst } from "@/lib/limits";
 import { fail } from "@/lib/http";
 
@@ -15,8 +16,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!(await softBurst(`token:${address}`, 20, 60_000))) return fail(429, "Too many lookups. Wait a minute.");
 
   try {
-    const token = await getOwnedToken(address, id);
-    if (!token) return fail(403, `Chog #${id} is not in your wallet.`);
+    const token = await getOwnedTokenAny(await accountAddresses(address), id);
+    if (!token) return fail(403, `Chog #${id} is not in your wallets.`);
     return NextResponse.json(token);
   } catch (e) {
     console.error("[token] lookup failed", e);

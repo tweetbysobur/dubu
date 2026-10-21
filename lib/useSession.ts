@@ -102,15 +102,18 @@ export function useSession() {
     walletSignIn.mutate();
   }, [needsWalletSig, walletAddress, walletSignIn]);
 
-  // The connected wallet switched accounts: the old session no longer matches it.
+  // The wallet that owns this session switched accounts: the session no longer matches it.
+  // A wallet connected only to be linked (passkey session) never ends the session.
   const lastWallet = useRef<string | undefined>(undefined);
+  const sessionAddress = me.data?.address;
   useEffect(() => {
-    if (lastWallet.current && walletAddress && lastWallet.current !== walletAddress) {
+    const ownedSession = !!lastWallet.current && sessionAddress === lastWallet.current.toLowerCase();
+    if (ownedSession && walletAddress && lastWallet.current !== walletAddress) {
       autoTried.current = null;
       api("/api/auth/logout", { method: "POST" }).finally(() => qc.setQueryData(["me"], null));
     }
     lastWallet.current = walletAddress;
-  }, [walletAddress, qc]);
+  }, [walletAddress, sessionAddress, qc]);
 
   let state: "loading" | "signed-out" | "wallet-signing" | "ready" | "error";
   if (me.isPending || walletStatus === "reconnecting") state = "loading";
