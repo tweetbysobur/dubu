@@ -5,9 +5,10 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useHeroCtaOffscreen } from "@/lib/heroCta";
 import { useMe, useSignOut } from "@/lib/useSession";
-import type { TierId } from "@/lib/api";
+import { formatChog, formatMon, TIER_NAME, type Me, type TierId } from "@/lib/api";
 import { LevelBadge, LevelMark } from "./LevelBadge";
 import { Logo } from "./Logo";
+import { TokenIcon } from "./TokenIcon";
 import { buttonClass, Spinner } from "./ui";
 
 function short(a: string) {
@@ -110,13 +111,55 @@ function AccountMenu({ address, tier }: { address: string; tier: TierId }) {
   );
 }
 
-/** Phone menu: three-line button that opens a full-width panel under the header. */
-function MobileMenu({ links, address, tier, signInHref }: { links: NavLink[]; address?: string; tier: TierId; signInHref: string }) {
+const NAV_ICONS: Record<string, string> = {
+  "/studio": "M4 7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM16 10l4-2.5v9L16 14",
+  "/profile": "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20a8 8 0 0 1 16 0",
+  "/faq": "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6M12 17h.01",
+  "/": "M3 11.5 12 4l9 7.5M5.5 10v9.5h13V10",
+  "#how-it-works": "M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01",
+  "#holders": "M12 2.5 20.5 7v10L12 21.5 3.5 17V7zM12 8l1.2 2.6 2.8.3-2.1 1.9.6 2.8L12 14.2l-2.5 1.4.6-2.8L8 10.9l2.8-.3z",
+  "#faq": "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6M12 17h.01",
+};
+
+function Glyph({ d, size = 20 }: { d: string; size?: number }) {
+  return (
+    <svg aria-hidden width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  );
+}
+
+/** Phone menu: a full-height sheet under the header. Account first, then pages, sign out last. */
+function MobileMenu({ links, me, signInHref }: { links: NavLink[]; me: Me | null | undefined; signInHref: string }) {
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const signOut = useSignOut();
   useDismiss(open, () => setOpen(false), ref);
   useEffect(() => setOpen(false), [pathname]);
+
+  // The page behind should not scroll while the sheet is open.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  async function copy(address: string) {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard blocked: the address is on the Deposit page to select by hand.
+    }
+  }
+
+  const close = () => setOpen(false);
 
   return (
     <div ref={ref} className="sm:hidden">
@@ -133,34 +176,94 @@ function MobileMenu({ links, address, tier, signInHref }: { links: NavLink[]; ad
         </svg>
       </button>
       {open && (
-        <div id="mobile-menu" className="absolute inset-x-0 top-full border-b border-line bg-white shadow-[0_16px_32px_rgba(11,18,32,0.08)]">
-          <nav aria-label="Menu" className="px-4 py-2">
-            {links.map((l) => (
-              <a
-                key={l.href}
-                href={l.href}
-                onClick={() => setOpen(false)}
-                className="flex h-14 items-center border-b border-line text-lg font-semibold last:border-b-0"
-              >
-                {l.label}
-              </a>
-            ))}
-          </nav>
-          <div className="border-t border-line bg-surface px-4 py-4">
-            {address ? (
-              <>
-                <LevelBadge tier={tier} size="sm" />
-                <p className="mt-2 break-all text-sm font-medium tabular-nums">{address}</p>
-                <Link href="/deposit" onClick={() => setOpen(false)} className={`${buttonClass("primary", "lg")} mt-4 w-full`}>
-                  Deposit
-                </Link>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <CopyAddress address={address} />
-                  <SignOutButton onDone={() => setOpen(false)} />
+        <div
+          id="mobile-menu"
+          className="fixed inset-x-0 bottom-0 top-16 z-30 flex flex-col overflow-y-auto border-t border-line bg-white px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4"
+        >
+          {me && (
+            <section aria-label="Your wallet" className="rounded-3xl bg-brand p-4 text-white">
+              <div className="flex items-center gap-3">
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white/15">
+                  <LevelMark tier={me.tier} size={30} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold tabular-nums">{short(me.address)}</p>
+                  <p className="text-sm text-white/75">{TIER_NAME[me.tier]}</p>
                 </div>
-              </>
+                <button
+                  type="button"
+                  onClick={() => copy(me.address)}
+                  aria-label={copied ? "Address copied" : "Copy address"}
+                  className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-white/15 px-3 text-sm font-semibold hover:bg-white/25"
+                >
+                  {copied ? "Copied" : <Glyph d="M9 9h10v10H9zM5 15V5h10" size={18} />}
+                </button>
+              </div>
+
+              <div className="mt-4 flex items-end justify-between gap-3 border-t border-white/15 pt-4">
+                <div className="min-w-0">
+                  <p className="text-sm text-white/75">Balance</p>
+                  <p className="mt-0.5 flex items-center gap-2 font-display text-2xl font-bold tabular-nums">
+                    <TokenIcon token="mon" size={24} />
+                    {me.mon.balance === null ? "-" : formatMon(me.mon.balance)} <span className="text-base text-white/80">MON</span>
+                  </p>
+                </div>
+                {me.chog.tracked && (
+                  <p className="flex shrink-0 items-center gap-1.5 pb-1 text-sm font-semibold tabular-nums text-white/90">
+                    <TokenIcon token="chog" size={18} />
+                    {formatChog(me.chog.balance)} CHOG
+                  </p>
+                )}
+              </div>
+
+              <Link
+                href="/deposit"
+                onClick={close}
+                className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white text-[15px] font-semibold text-brand hover:bg-wash"
+              >
+                <Glyph d="M12 5v14M5 12l7 7 7-7" size={18} />
+                Deposit
+              </Link>
+            </section>
+          )}
+
+          <nav aria-label="Menu" className="mt-4">
+            <ul className="space-y-1">
+              {links.map((l) => {
+                const active = !l.href.startsWith("#") && pathname === l.href;
+                return (
+                  <li key={l.href}>
+                    <a
+                      href={l.href}
+                      onClick={close}
+                      aria-current={active ? "page" : undefined}
+                      className={`flex h-14 items-center gap-3 rounded-2xl px-3 text-[17px] font-semibold ${active ? "bg-wash text-brand" : "text-ink hover:bg-surface"}`}
+                    >
+                      <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${active ? "bg-white text-brand" : "bg-surface text-mute"}`}>
+                        <Glyph d={NAV_ICONS[l.href] ?? NAV_ICONS["/"]} />
+                      </span>
+                      <span className="flex-1">{l.label}</span>
+                      <Glyph d="M9 6l6 6-6 6" size={18} />
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          <div className="mt-auto pt-6">
+            {me ? (
+              <button
+                type="button"
+                disabled={signOut.isPending}
+                onClick={() => signOut.mutate(undefined, { onSettled: close })}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-line text-[15px] font-semibold text-danger hover:bg-danger-wash"
+              >
+                {signOut.isPending ? <Spinner /> : <Glyph d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 8l-4 4 4 4M6 12h10" size={18} />}
+                Sign out
+              </button>
             ) : (
-              <a href={signInHref} onClick={() => setOpen(false)} className={`${buttonClass("primary", "lg")} w-full`}>
+              <a href={signInHref} onClick={close} className={`${buttonClass("primary", "lg")} w-full`}>
                 Sign in
               </a>
             )}
@@ -232,7 +335,7 @@ export function Header() {
           )}
         </div>
 
-        <MobileMenu links={links} address={me.data?.address} tier={me.data?.tier ?? "free"} signInHref={signInHref} />
+        <MobileMenu links={links} me={me.data} signInHref={signInHref} />
       </div>
     </header>
   );
