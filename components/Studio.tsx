@@ -5,8 +5,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { trackJob } from "@/lib/notify";
 import { LevelBadge } from "./LevelBadge";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, TIER_NAME, type Me } from "@/lib/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, type Me, type TierFacts } from "@/lib/api";
 import { Alert, Button, Container, Panel } from "@/components/ui";
 import { Mascot } from "@/components/Mascot";
 import { ChogPicker } from "@/components/ChogPicker";
@@ -42,6 +42,9 @@ export function Studio({ me }: { me: Me }) {
   const [tokenId, setTokenId] = useState<string | null>(me.tokens[0]?.tokenId ?? null);
   const [upload, setUpload] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
+  const tiers = useQuery<TierFacts>({ queryKey: ["tiers"], queryFn: () => api<TierFacts>("/api/tiers") });
+  const directorOn = !!tiers.data?.director;
+  const [directing, setDirecting] = useState(true);
 
   const hasChog = holder && tokens.length > 0;
   const activeChog = tokens.find((t) => t.tokenId === tokenId) ?? tokens[0];
@@ -53,7 +56,11 @@ export function Studio({ me }: { me: Me }) {
     mutationFn: () =>
       api<{ id: string }>("/api/generate", {
         method: "POST",
-        body: JSON.stringify(hasChog ? { prompt, tokenId: activeChog?.tokenId } : { prompt, image: upload }),
+        body: JSON.stringify({
+          prompt,
+          direct: directorOn && directing,
+          ...(hasChog ? { tokenId: activeChog?.tokenId } : { image: upload }),
+        }),
       }),
     onSuccess: ({ id }) => {
       trackJob(id); // announced with a notification when it finishes, wherever the user is
@@ -141,6 +148,23 @@ export function Studio({ me }: { me: Me }) {
               className="mt-4 w-full resize-none rounded-2xl border border-line bg-white px-4 py-3.5 text-base leading-relaxed outline-none placeholder:text-mute/70 focus:border-brand"
             />
             <p className="mt-2 text-right text-xs tabular-nums text-mute">{prompt.length}/500</p>
+            {directorOn && (
+              <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl bg-surface p-3.5">
+                <input
+                  type="checkbox"
+                  checked={directing}
+                  onChange={(e) => setDirecting(e.target.checked)}
+                  className="mt-0.5 size-5 shrink-0 accent-[#1F4FFF]"
+                />
+                <span className="text-sm leading-relaxed">
+                  <span className="font-semibold">Let Dubu direct the shot</span>
+                  <span className="block text-mute">
+                    Dubu turns your sentence into a full shot: one action, a camera move, light and mood
+                    {hasChog ? ", and your Chog's traits" : ""}. You see it with your video.
+                  </span>
+                </span>
+              </label>
+            )}
             <Button
               size="lg"
               className="mt-4 w-full"
@@ -148,7 +172,7 @@ export function Studio({ me }: { me: Me }) {
               disabled={!!blocker}
               onClick={() => generate.mutate()}
             >
-              {generate.isPending ? "Starting your video" : (blocker ?? "Make my video")}
+              {generate.isPending ? (directorOn && directing ? "Directing the shot" : "Starting your video") : (blocker ?? "Make my video")}
             </Button>
             {generate.isError && (
               <div className="mt-4">

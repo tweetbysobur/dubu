@@ -4,6 +4,7 @@ import { PROVIDER } from "@/lib/video";
 import { chogTracked } from "@/lib/standing";
 import { chogMinSetting } from "@/lib/tiers";
 import { swapConfigured, swapOpen } from "@/lib/swap";
+import { directorEnabled } from "@/lib/director";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export async function GET() {
       chogTokenMin: chogMinSetting() !== null,
       swapConfigured: swapConfigured(),
       swapOpen: swapOpen(),
+      director: directorEnabled(),
       sessionSecret: (process.env.SESSION_SECRET?.length ?? 0) >= 32,
     },
     { status: storeOk ? 200 : 503 },

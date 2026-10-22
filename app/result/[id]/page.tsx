@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { api, ApiError, TIER_NAME, type JobStatus } from "@/lib/api";
+import { api, ApiError, type JobStatus } from "@/lib/api";
 import { burnWatermark, saveBlob } from "@/lib/watermark";
 import { Alert, Button, Container, buttonClass } from "@/components/ui";
 import { Mascot, type Mood } from "@/components/Mascot";
+import { LevelBadge } from "@/components/LevelBadge";
 
 function fileStamp() {
   const d = new Date();
@@ -133,11 +134,17 @@ export default function ResultPage() {
 
             <div className="mt-6 grid gap-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
               <div>
-                <h2 className="text-sm font-medium text-mute">Prompt</h2>
+                <h2 className="text-sm font-medium text-mute">Your idea</h2>
                 <p className="mt-1 text-lg leading-relaxed">{job.data.prompt}</p>
-                <p className="mt-3 flex items-center gap-2 text-sm text-mute">
-                  <span aria-hidden className={`size-2 shrink-0 rounded-full ${job.data.tier === "free" ? "bg-mute" : "bg-brand"}`} />
-                  {job.data.watermark ? `${TIER_NAME[job.data.tier]}. Download has a watermark.` : `${TIER_NAME[job.data.tier]}. No watermark.`}
+                {job.data.shot && (
+                  <div className="mt-4 border-l-2 border-brand pl-4">
+                    <h2 className="text-sm font-medium text-mute">The shot Dubu directed</h2>
+                    <p className="mt-1 leading-relaxed">{job.data.shot}</p>
+                  </div>
+                )}
+                <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-mute">
+                  <LevelBadge tier={job.data.tier} size="sm" />
+                  {job.data.watermark ? "Download has a watermark." : "No watermark."}
                 </p>
               </div>
               <div className="flex flex-col gap-3 sm:w-56">

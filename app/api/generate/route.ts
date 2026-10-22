@@ -17,11 +17,12 @@ import {
 import { createVideo } from "@/lib/video";
 import { encodeJob } from "@/lib/jobs";
 import { fail, readJson } from "@/lib/http";
+import { direct } from "@/lib/director";
 
 const MAX_IMAGE_CHARS = 2_000_000; // ~1.5 MB after base64
 const DATA_URL = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
 
-type Body = { prompt?: string; tokenId?: string; image?: string };
+type Body = { prompt?: string; tokenId?: string; image?: string; direct?: boolean };
 
 function cleanPrompt(p: unknown) {
   if (typeof p !== "string") return null;
@@ -75,6 +76,7 @@ export async function POST(req: Request) {
 
   let image: string;
   let finalPrompt = prompt;
+  let chog: ChogToken | null = null;
 
   if (tier === "holder" && body.tokenId != null && body.tokenId !== "") {
     const id = String(body.tokenId);
@@ -88,6 +90,7 @@ export async function POST(req: Request) {
     }
     if (!token) return fail(403, "That Chog is not in your wallets.");
     image = token.image;
+    chog = token;
     finalPrompt = holderPrompt(prompt, token);
   } else {
     if (typeof body.image !== "string" || !DATA_URL.test(body.image)) {
@@ -118,6 +121,21 @@ export async function POST(req: Request) {
     return fail(503, "Usage service is unavailable. Try again shortly.");
   }
 
+  // The director writes the shot (and screens uploads) after the quota is reserved, so it is rate limited too.
+  let shot: string | null = null;
+  if (body.direct !== false) {
+    const d = await direct({ prompt, image, tier, chog });
+    if (d.kind === "rejected") {
+      await refundUse(address).catch(() => {});
+      if (tier === "free") await refundFreeIp(ip).catch(() => {});
+      return fail(422, `${d.reason} Try another image. This did not use a video.`, { rejected: true });
+    }
+    if (d.kind === "shot") {
+      shot = d.shot;
+      finalPrompt = chog ? `${shot} Keep the Chog exactly as in the reference image: same face, colors and accessories.` : shot;
+    }
+  }
+
   let providerId: string;
   try {
     providerId = await createVideo({ tier, image, prompt: finalPrompt });
@@ -128,6 +146,6 @@ export async function POST(req: Request) {
     return fail(502, "The video service rejected the request. Try a different image or prompt.");
   }
 
-  const id = encodeJob({ id: providerId, address, tier, prompt, createdAt: Date.now() });
-  return NextResponse.json({ id, tier, used, limit });
+  const id = encodeJob({ id: providerId, address, tier, prompt, shot: shot ?? undefined, createdAt: Date.now() });
+  return NextResponse.json({ id, tier, used, limit, shot });
 }

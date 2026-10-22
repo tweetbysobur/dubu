@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { swapOpen } from "@/lib/swap";
+import { directorEnabled } from "@/lib/director";
 import { chogMinSetting, clipSeconds, dailyLimit, TIER_INFO } from "@/lib/tiers";
 
 export const dynamic = "force-dynamic";
@@ -15,5 +16,6 @@ export function GET() {
     clipSeconds: clipSeconds(),
     /** True once the MON to CHOG swap is open to everyone. */
     swap: swapOpen(),
+    director: directorEnabled(),
   });
 }

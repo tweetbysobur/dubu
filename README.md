@@ -26,11 +26,18 @@ Video provider: deAPI when `DEAPI_API_KEY` is set (free $5 credit at signup, no 
 | `ALCHEMY_API_KEY` | Lists token IDs when the contract is not ERC721Enumerable |
 | `DEAPI_API_KEY` | deAPI key (free credits). Takes priority over Replicate. Server only |
 | `DEAPI_MODEL` / `DEAPI_SIZE_*` / `DEAPI_FRAMES` / `DEAPI_FPS` / `DEAPI_STEPS` | deAPI model and output settings. Defaults: LTX-Video 13B distilled, 512 free / 768 holder, 120 frames at 30 fps |
+| `ANTHROPIC_API_KEY` / `DIRECTOR_MODEL` | Turns on the director (Claude) that writes each shot. Server only |
 | `REPLICATE_API_TOKEN` | Replicate key (paid). Server only |
 | `REPLICATE_MODEL` | Image-to-video model. Default `wan-video/wan-2.2-i2v-fast` |
 | `REPLICATE_INPUT_HOLDER` / `_FREE` | Extra model inputs per tier, as JSON |
 | `HOLDER_DAILY_LIMIT` / `FREE_DAILY_LIMIT` | Generations per wallet per UTC day. Defaults 50 and 3 |
 | `DEMO_HOLDER_ADDRESSES` / `DEMO_CHOG_IMAGE_URL` | Treat listed wallets as holders for a demo |
+
+## Director
+
+When `ANTHROPIC_API_KEY` is set, one Claude call runs before each render (`lib/director.ts`). It sees the image and the user's sentence and writes the shot the video model gets: one action that fits the clip, a camera move, light and mood, and the same character from start to end. For a Genesis holder it also works in the Chog's name and traits. For uploads it first decides whether the image can be animated, and a refused image costs no video.
+
+It runs after the daily quota is reserved, so it is rate limited like generation. If Claude is slow, down or replies oddly, the user's own sentence goes to the video model instead. Users can turn it off per video in the studio. The result page shows both the user's idea and the shot. `DIRECTOR_MODEL` picks the model (default `claude-haiku-5-5`).
 
 ## Sign-in
 

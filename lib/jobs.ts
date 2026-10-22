@@ -1,7 +1,7 @@
 import { hmac, safeEqual } from "./session";
 import type { Tier } from "./tiers";
 
-export type Job = { id: string; address: string; tier: Tier; prompt: string; createdAt: number };
+export type Job = { id: string; address: string; tier: Tier; prompt: string; shot?: string; createdAt: number };
 
 const JOB_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -11,7 +11,7 @@ const JOB_TTL_MS = 24 * 60 * 60 * 1000;
  */
 export function encodeJob(job: Job): string {
   const payload = Buffer.from(
-    JSON.stringify({ i: job.id, a: job.address.toLowerCase(), t: job.tier, p: job.prompt, c: job.createdAt }),
+    JSON.stringify({ i: job.id, a: job.address.toLowerCase(), t: job.tier, p: job.prompt, ...(job.shot ? { s: job.shot } : {}), c: job.createdAt }),
   ).toString("base64url");
   return `${payload}.${hmac(payload)}`;
 }
@@ -29,7 +29,7 @@ export function decodeJob(token: string): Job | null {
     }
     if (d.t !== "holder" && d.t !== "token" && d.t !== "free") return null;
     if (Date.now() - d.c > JOB_TTL_MS) return null;
-    return { id: d.i, address: d.a, tier: d.t, prompt: d.p, createdAt: d.c };
+    return { id: d.i, address: d.a, tier: d.t, prompt: d.p, ...(typeof d.s === "string" ? { shot: d.s } : {}), createdAt: d.c };
   } catch {
     return null;
   }

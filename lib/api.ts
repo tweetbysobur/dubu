@@ -69,6 +69,8 @@ export type TierFacts = {
   clipSeconds: number | null;
   /** True when the MON to CHOG swap is open to everyone. */
   swap: boolean;
+  /** True when Dubu's director writes the shot before each render. */
+  director: boolean;
 };
 
 export type JobStatus = {
@@ -78,5 +80,7 @@ export type JobStatus = {
   tier: TierId;
   watermark: boolean;
   prompt: string;
+  /** The shot the director wrote, when it ran. */
+  shot?: string | null;
   videoUrl?: string;
 };

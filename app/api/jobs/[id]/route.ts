@@ -25,6 +25,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       tier: job.tier,
       watermark: TIER_INFO[job.tier].watermark,
       prompt: job.prompt,
+      shot: job.shot ?? null,
       // The browser only ever sees our own URL, never the provider's
       videoUrl: v.status === "succeeded" ? `/api/jobs/${encodeURIComponent(id)}/video` : undefined,
     });
