@@ -18,10 +18,11 @@ export function LevelMark({ tier, size = 20 }: { tier: TierId; size?: number }) 
       </svg>
     );
   }
+  // Free: a solid play tile, the same weight as the other two marks.
   return (
     <svg aria-hidden width={size} height={size} viewBox="0 0 24 24" className="shrink-0">
-      <rect x="2.5" y="2.5" width="19" height="19" rx="6" fill="#FFFFFF" stroke="#C9D2E3" strokeWidth="1.5" />
-      <path d="M10 8.4v7.2a.6.6 0 0 0 .9.52l5.7-3.6a.6.6 0 0 0 0-1.04l-5.7-3.6a.6.6 0 0 0-.9.52z" fill="#4A5568" />
+      <rect x="1.5" y="1.5" width="21" height="21" rx="7" fill="#0B1220" />
+      <path d="M9.6 7.9v8.2a.7.7 0 0 0 1.06.6l6.5-4.1a.7.7 0 0 0 0-1.2l-6.5-4.1a.7.7 0 0 0-1.06.6z" fill="#FFFFFF" />
     </svg>
   );
 }
