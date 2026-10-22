@@ -107,14 +107,28 @@ async function deapiSubmit(profile: Profile, { tier, bytes, type, prompt }: { ti
   return { res, data };
 }
 
+/** The video service is at its rate limit. Nothing was made, and the person can retry shortly. */
+export class VideoBusyError extends Error {}
+
 async function deapiCreate({ tier, image, prompt }: CreateArgs): Promise<string> {
   const { bytes, type } = await loadImage(image);
   const primary = videoProfile();
   let { res, data } = await deapiSubmit(primary, { tier, bytes, type, prompt });
 
+  // Rate limited: wait as asked (a few seconds at most) and try once more on the same model.
+  if (res.status === 429) {
+    const wait = Math.min(Math.max(Number(res.headers.get("retry-after")) || 2, 1), 5) * 1000;
+    await new Promise((r) => setTimeout(r, wait));
+    ({ res, data } = await deapiSubmit(primary, { tier, bytes, type, prompt }));
+    if (res.status === 429) {
+      console.error("[deapi] still rate limited after one retry");
+      throw new VideoBusyError("rate limited");
+    }
+  }
+
   // If deAPI refuses the newer model's request (renamed slug, a size it does not take),
   // run the job on the older model instead of failing the person's video.
-  if (!res.ok && res.status >= 400 && res.status < 500 && res.status !== 401 && res.status !== 402 && primary !== LTXV13) {
+  if (!res.ok && res.status >= 400 && res.status < 500 && ![401, 402, 429].includes(res.status) && primary !== LTXV13) {
     console.error("[deapi] primary model refused, using fallback", res.status, JSON.stringify(data).slice(0, 400));
     ({ res, data } = await deapiSubmit(LTXV13, { tier, bytes, type, prompt }));
   }

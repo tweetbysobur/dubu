@@ -15,7 +15,7 @@ import {
   reserveFreeIp,
   reserveUse,
 } from "@/lib/limits";
-import { createVideo } from "@/lib/video";
+import { createVideo, VideoBusyError } from "@/lib/video";
 import { encodeJob } from "@/lib/jobs";
 import { fail, readJson } from "@/lib/http";
 import { direct, expandPrompt } from "@/lib/director";
@@ -149,7 +149,10 @@ export async function POST(req: Request) {
     console.error("[generate] provider error", e);
     await refundUse(address).catch(() => {});
     if (tier === "free") await refundFreeIp(ip).catch(() => {});
-    return fail(502, "The video service rejected the request. Try a different image or prompt.");
+    if (e instanceof VideoBusyError) {
+      return fail(503, "Dubu is busy right now. Wait a minute and try again. This one did not count.");
+    }
+    return fail(502, "The video service could not start this one. Try again, or try a different image. This one did not count.");
   }
 
   const id = encodeJob({ id: providerId, address, tier, prompt, shot: shot ?? undefined, createdAt: Date.now() });
