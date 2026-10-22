@@ -12,7 +12,6 @@ import { Alert, Button, Container, Panel, Spinner, buttonClass } from "@/compone
 import { Mascot } from "@/components/Mascot";
 import { ExportWallet } from "@/components/ExportWallet";
 import { TokenIdLoader } from "@/components/TokenIdLoader";
-import { Swap } from "@/components/Swap";
 import { TokenIcon } from "@/components/TokenIcon";
 import { ChogFrame } from "@/components/ChogFrame";
 import { LevelBadge, LevelMark } from "@/components/LevelBadge";
@@ -108,8 +107,6 @@ function Profile({ me }: { me: Me }) {
         <WalletCard me={me} isPasskey={isPasskey} />
         <LevelCard me={me} nftWallet={holderSource?.address} />
         <MyChogs me={me} />
-
-        {me.swap && <Swap address={me.address} monBalance={me.mon.balance} isPasskey={isPasskey} />}
 
         <LinkedWallets linked={linked} account={me.address} tracked={me.chog.tracked} tier={me.tier} />
 
@@ -212,10 +209,10 @@ function WalletCard({ me, isPasskey }: { me: Me; isPasskey: boolean }) {
           Deposit
         </Link>
         {me.swap && (
-          <a href="#swap" className={`${action} bg-white/15 text-white hover:bg-white/25`}>
+          <Link href="/swap" className={`${action} bg-white/15 text-white hover:bg-white/25`}>
             <Icon d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />
-            Get CHOG
-          </a>
+            Swap
+          </Link>
         )}
       </div>
     </section>

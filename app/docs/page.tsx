@@ -317,12 +317,21 @@ export default function DocsPage() {
                 QR code, then send MON on the Monad network only.
               </p>
               {swap ? (
-                <p>
-                  Swap turns MON into CHOG inside Dubu. Dubu compares Nad.fun and Uniswap and uses the better price. You see
-                  the minimum you will get before you confirm, and Max keeps a little MON back for network fees.
-                </p>
+                <>
+                  <p>
+                    <Link href="/swap" className={a}>
+                      Swap
+                    </Link>{" "}
+                    buys or sells CHOG with MON. Dubu compares Nad.fun and Uniswap and uses the better price. You see the
+                    minimum you will get before you confirm, and Max on a buy keeps a little MON back for network fees.
+                  </p>
+                  <p>
+                    Selling takes two confirmations. First you allow exactly that much CHOG to be used, then you confirm the
+                    sale. Both cost a small network fee in MON.
+                  </p>
+                </>
               ) : (
-                <p>Swapping MON to CHOG inside Dubu is coming soon.</p>
+                <p>Swapping between MON and CHOG inside Dubu is coming soon.</p>
               )}
             </Section>
 

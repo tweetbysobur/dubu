@@ -93,7 +93,7 @@ function SignOutButton({ onDone }: { onDone: () => void }) {
 }
 
 /** Desktop account dropdown. */
-function AccountMenu({ address, tier }: { address: string; tier: TierId }) {
+function AccountMenu({ address, tier, swap }: { address: string; tier: TierId; swap: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(open, () => setOpen(false), ref);
@@ -118,9 +118,16 @@ function AccountMenu({ address, tier }: { address: string; tier: TierId }) {
           <LevelBadge tier={tier} size="sm" />
           <p className="mt-2 break-all text-sm font-medium tabular-nums">{address}</p>
           <div className="mt-4 grid gap-2">
-            <Link href="/deposit" onClick={() => setOpen(false)} className={buttonClass("primary")}>
-              Deposit
-            </Link>
+            <div className={`grid gap-2 ${swap ? "grid-cols-2" : ""}`}>
+              <Link href="/deposit" onClick={() => setOpen(false)} className={buttonClass("primary")}>
+                Deposit
+              </Link>
+              {swap && (
+                <Link href="/swap" onClick={() => setOpen(false)} className={buttonClass("ghost")}>
+                  Swap
+                </Link>
+              )}
+            </div>
             <Link href="/profile" onClick={() => setOpen(false)} className={buttonClass("ghost")}>
               Profile and linked wallets
             </Link>
@@ -240,14 +247,26 @@ function MobileMenu({ links, me, signInHref }: { links: NavLink[]; me: Me | null
                 )}
               </div>
 
-              <Link
-                href="/deposit"
-                onClick={close}
-                className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white text-[15px] font-semibold text-brand hover:bg-wash"
-              >
-                <Glyph d="M12 5v14M5 12l7 7 7-7" size={18} />
-                Deposit
-              </Link>
+              <div className={`mt-4 grid gap-2 ${me.swap ? "grid-cols-2" : ""}`}>
+                <Link
+                  href="/deposit"
+                  onClick={close}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white text-[15px] font-semibold text-brand hover:bg-wash"
+                >
+                  <Glyph d="M12 5v14M5 12l7 7 7-7" size={18} />
+                  Deposit
+                </Link>
+                {me.swap && (
+                  <Link
+                    href="/swap"
+                    onClick={close}
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white/15 text-[15px] font-semibold text-white hover:bg-white/25"
+                  >
+                    <Glyph d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" size={18} />
+                    Swap
+                  </Link>
+                )}
+              </div>
             </section>
           )}
 
@@ -372,7 +391,7 @@ export function Header() {
               );
             })}
           </nav>
-          {signedIn && me.data && <AccountMenu address={me.data.address} tier={me.data.tier} />}
+          {signedIn && me.data && <AccountMenu address={me.data.address} tier={me.data.tier} swap={me.data.swap} />}
           {!signedIn && me.data === null && (!landing || heroCtaOffscreen) && (
             <a href={signInHref} className={buttonClass("primary")}>
               Sign in
