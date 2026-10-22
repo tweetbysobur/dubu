@@ -5,6 +5,7 @@ import { Container } from "./ui";
 const links = [
   { href: "/studio", label: "Studio" },
   { href: "/profile", label: "Profile" },
+  { href: "/docs", label: "Docs" },
   { href: "/faq", label: "FAQ" },
 ];
 

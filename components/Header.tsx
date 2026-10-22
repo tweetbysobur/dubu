@@ -138,6 +138,7 @@ const NAV_ICONS: Record<string, string> = {
   "/studio": "M4 7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM16 10l4-2.5v9L16 14",
   "/profile": "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20a8 8 0 0 1 16 0",
   "/faq": "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6M12 17h.01",
+  "/docs": "M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7",
   "/": "M3 11.5 12 4l9 7.5M5.5 10v9.5h13V10",
   "#how-it-works": "M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01",
   "#holders": "M12 2.5 20.5 7v10L12 21.5 3.5 17V7zM12 8l1.2 2.6 2.8.3-2.1 1.9.6 2.8L12 14.2l-2.5 1.4.6-2.8L8 10.9l2.8-.3z",
@@ -327,16 +328,19 @@ export function Header() {
         { href: "#how-it-works", label: "How it works" },
         { href: "#holders", label: "Holder mode" },
         { href: "#faq", label: "FAQ" },
+        { href: "/docs", label: "Docs" },
         ...(signedIn ? [{ href: "/studio", label: "Studio" }] : []),
       ]
     : signedIn
       ? [
           { href: "/studio", label: "Studio" },
           { href: "/profile", label: "Profile" },
+          { href: "/docs", label: "Docs" },
           { href: "/faq", label: "FAQ" },
         ]
       : [
           { href: "/", label: "Home" },
+          { href: "/docs", label: "Docs" },
           { href: "/faq", label: "FAQ" },
         ];
   const signInHref = landing ? "#sign-in" : "/#sign-in";
