@@ -10,6 +10,7 @@ const abi = parseAbi([
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
   "function tokenURI(uint256 tokenId) view returns (string)",
   "function ownerOf(uint256 tokenId) view returns (address)",
+  "function supportsInterface(bytes4 interfaceId) view returns (bool)",
 ]);
 
 export const TOKEN_ID = /^\d{1,7}$/;
@@ -96,7 +97,7 @@ async function tokensFromAlchemy(owner: Address): Promise<ChogToken[]> {
   const key = process.env.ALCHEMY_API_KEY;
   if (!key) return [];
   const net = activeChain.testnet ? "monad-testnet" : "monad-mainnet";
-  const url = `https://${net}.g.alchemy.com/nft/v3/${key}/getNFTsForOwner?owner=${owner}&contractAddresses[]=${contract}&withMetadata=true&pageSize=5`;
+  const url = `https://${net}.g.alchemy.com/nft/v3/${key}/getNFTsForOwner?owner=${owner}&contractAddresses[]=${contract}&withMetadata=true&pageSize=20`;
   const res = await fetch(url);
   if (!res.ok) return [];
   const data = await res.json();
@@ -159,7 +160,7 @@ export async function getHolderStatus(address: string): Promise<HolderStatus> {
   const balance = await client.readContract({ address: contract, abi, functionName: "balanceOf", args: [address] });
   if (balance === 0n) return { holder: false, tokens: [] };
 
-  const count = Math.min(Number(balance), 5);
+  const count = Math.min(Number(balance), 20);
   let tokens: ChogToken[] = [];
   try {
     tokens = await tokensFromEnumerable(address, count);
@@ -192,4 +193,16 @@ export async function getOwnedTokenAny(addresses: string[], tokenId: string): Pr
     if (t) return { ...t, owner: a.toLowerCase() };
   }
   return null;
+}
+
+/** How Dubu finds a holder's Chogs: listed onchain, through Alchemy, or added by number. */
+export async function chogListing(): Promise<"enumerable" | "alchemy" | "manual" | "off"> {
+  if (!contract) return "off";
+  try {
+    const ok = await client.readContract({ address: contract, abi, functionName: "supportsInterface", args: ["0x780e9d63"] });
+    if (ok) return "enumerable";
+  } catch {
+    // not ERC-165: fall through
+  }
+  return process.env.ALCHEMY_API_KEY ? "alchemy" : "manual";
 }

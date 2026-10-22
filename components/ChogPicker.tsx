@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Me } from "@/lib/api";
 import { ChogFrame } from "./ChogFrame";
 
@@ -13,11 +14,15 @@ export function ChogPicker({
   onSelect: (id: string) => void;
 }) {
   const active = tokens.find((t) => t.tokenId === selected) ?? tokens[0];
+  // Served through Dubu with backup IPFS gateways; the raw metadata URL is the fallback.
+  const [direct, setDirect] = useState<Set<string>>(new Set());
+  const imgSrc = (t: Me["tokens"][number]) => (direct.has(t.tokenId) ? t.image : `/api/chogs/${encodeURIComponent(t.tokenId)}/image`);
+  const fallback = (t: Me["tokens"][number]) => setDirect((d) => (d.has(t.tokenId) ? d : new Set(d).add(t.tokenId)));
 
   return (
     <div>
       {/* Through the viewfinder: this is the Chog Dubu is about to film. */}
-      <ChogFrame tokenId={active.tokenId} src={active.image} alt={active.name} size="lg" />
+      <ChogFrame tokenId={active.tokenId} src={imgSrc(active)} alt={active.name} size="lg" onError={() => fallback(active)} />
       <p className="mt-4 font-display text-lg font-bold tracking-[-0.01em]">{active.name}</p>
 
       {active.traits.length > 0 ? (
@@ -51,7 +56,7 @@ export function ChogPicker({
                 className={`size-14 overflow-hidden rounded-xl border-2 ${on ? "border-brand" : "border-transparent opacity-70 hover:opacity-100"}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={t.image} alt="" className="size-full object-cover" />
+                <img src={imgSrc(t)} alt="" className="size-full object-cover" onError={() => fallback(t)} />
               </button>
             );
           })}

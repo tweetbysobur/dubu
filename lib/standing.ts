@@ -1,5 +1,6 @@
 import { formatUnits, isAddress, parseAbi, parseUnits, type Address } from "viem";
-import { client, getAccountHolderStatus, type ChogToken } from "./chog";
+import { client, getAccountHolderStatus, getOwnedTokenAny, type ChogToken } from "./chog";
+import { setAdd, setMembers, setRemove } from "./store";
 import { chogMinSetting, type Tier } from "./tiers";
 
 // CHOG token (ERC-20) balances across an account's wallets, plus the tier decision.
@@ -69,6 +70,32 @@ export async function monBalance(address: string): Promise<string> {
   return formatUnits(await client.getBalance({ address: address as Address }), 18);
 }
 
+// Chogs a holder added by number, kept per account so they never have to type it twice.
+// Each one is re-checked with ownerOf on every read, so a sold Chog drops off by itself.
+const savedKey = (account: string) => `dubu:chogs:${account.toLowerCase()}`;
+
+export async function rememberChog(account: string, tokenId: string) {
+  await setAdd(savedKey(account), tokenId);
+}
+
+async function savedChogs(addresses: string[], known: ChogToken[]): Promise<ChogToken[]> {
+  let ids: string[];
+  try {
+    ids = (await setMembers(savedKey(addresses[0]))).slice(0, 20);
+  } catch {
+    return [];
+  }
+  const have = new Set(known.map((t) => t.tokenId));
+  const found = await Promise.all(
+    ids.filter((id) => !have.has(id)).map(async (id) => {
+      const t = await getOwnedTokenAny(addresses, id).catch(() => undefined);
+      if (t === null) await setRemove(savedKey(addresses[0]), id).catch(() => {});
+      return t ?? null;
+    }),
+  );
+  return found.filter((t): t is ChogToken => !!t);
+}
+
 /** Everything that decides an account's level: NFTs and CHOG balance across all its wallets. */
 export async function getStanding(addresses: string[]): Promise<Standing> {
   const tracked = chogTracked();
@@ -78,6 +105,19 @@ export async function getStanding(addresses: string[]): Promise<Standing> {
     getAccountHolderStatus(addresses),
     tracked ? Promise.all(addresses.map((a) => chogBalance(a, decimals))) : Promise.resolve(addresses.map(() => 0n)),
   ]);
+
+  const extra = await savedChogs(addresses, nft.tokens);
+  if (extra.length) {
+    nft.tokens = [...nft.tokens, ...extra];
+    nft.holder = true;
+    for (const t of extra) {
+      const w = nft.perWallet.find((p) => p.address === t.owner);
+      if (w) {
+        w.holder = true;
+        w.chogs = Math.max(w.chogs, nft.tokens.filter((x) => x.owner === w.address).length);
+      }
+    }
+  }
 
   const total = balances.reduce((s, b) => s + b, 0n);
   const minSetting = chogMinSetting();

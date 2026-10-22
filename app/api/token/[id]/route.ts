@@ -4,6 +4,7 @@ import { getOwnedTokenAny, TOKEN_ID } from "@/lib/chog";
 import { accountAddresses } from "@/lib/links";
 import { softBurst } from "@/lib/limits";
 import { fail } from "@/lib/http";
+import { rememberChog } from "@/lib/standing";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   try {
     const token = await getOwnedTokenAny(await accountAddresses(address), id);
     if (!token) return fail(403, `Chog #${id} is not in your wallets.`);
+    await rememberChog(address, id).catch(() => {});
     return NextResponse.json(token);
   } catch (e) {
     console.error("[token] lookup failed", e);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionAddress } from "@/lib/session";
-import { getOwnedTokenAny, type ChogToken } from "@/lib/chog";
+import { getOwnedTokenAny, uriCandidates, type ChogToken } from "@/lib/chog";
+import { fetchImage } from "@/lib/images";
 import { getStanding } from "@/lib/standing";
 import { accountAddresses } from "@/lib/links";
 import { dailyLimit, type Tier } from "@/lib/tiers";
@@ -28,6 +29,17 @@ function cleanPrompt(p: unknown) {
   if (typeof p !== "string") return null;
   const s = p.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
   return s.length >= 3 && s.length <= 500 ? s : null;
+}
+
+async function chogImageDataUrl(token: ChogToken): Promise<string | null> {
+  if (token.image.startsWith("data:image/")) return token.image;
+  const urls = token.imageUri ? uriCandidates(token.imageUri) : [token.image];
+  for (const url of urls) {
+    const img = await fetchImage(url).catch(() => null);
+    if (img && /^image\/(png|jpeg|webp)$/.test(img.type)) return `data:${img.type};base64,${Buffer.from(img.body).toString("base64")}`;
+  }
+  // Another format (a GIF, say) or every gateway down: hand over the URL, as before.
+  return /^https?:\/\//.test(token.image) ? token.image : null;
 }
 
 export async function POST(req: Request) {
@@ -79,7 +91,10 @@ export async function POST(req: Request) {
       }
     }
     if (!token) return fail(403, "That Chog is not in your wallets.");
-    image = token.image;
+    // Fetch the art here, trying backup IPFS gateways, so a slow gateway never fails the video.
+    const art = await chogImageDataUrl(token);
+    if (!art) return fail(502, "Could not load your Chog's image right now. Try again in a minute.");
+    image = art;
     chog = token;
 
   } else {

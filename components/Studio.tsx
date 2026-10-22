@@ -41,6 +41,11 @@ export function Studio({ me }: { me: Me }) {
 
   const [tokens, setTokens] = useState(me.tokens);
   const [tokenId, setTokenId] = useState<string | null>(me.tokens[0]?.tokenId ?? null);
+  // Arriving from Profile with a Chog picked: start with that one.
+  useEffect(() => {
+    const want = new URLSearchParams(window.location.search).get("chog");
+    if (want && me.tokens.some((t) => t.tokenId === want)) setTokenId(want);
+  }, [me.tokens]);
   const [upload, setUpload] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const tiers = useQuery<TierFacts>({ queryKey: ["tiers"], queryFn: () => api<TierFacts>("/api/tiers") });
@@ -119,6 +124,7 @@ export function Studio({ me }: { me: Me }) {
                   onLoaded={(t) => {
                     setTokens([t]);
                     setTokenId(t.tokenId);
+                    qc.invalidateQueries({ queryKey: ["me"] }); // remembered for next time
                   }}
                 />
               ) : (

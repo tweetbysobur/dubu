@@ -11,6 +11,7 @@ import { memoryFor } from "@/lib/passkey";
 import { Alert, Button, Container, Panel, Spinner, buttonClass } from "@/components/ui";
 import { Mascot } from "@/components/Mascot";
 import { ExportWallet } from "@/components/ExportWallet";
+import { TokenIdLoader } from "@/components/TokenIdLoader";
 import { Swap } from "@/components/Swap";
 import { TokenIcon } from "@/components/TokenIcon";
 import { ChogFrame } from "@/components/ChogFrame";
@@ -106,6 +107,7 @@ function Profile({ me }: { me: Me }) {
 
         <WalletCard me={me} isPasskey={isPasskey} />
         <LevelCard me={me} nftWallet={holderSource?.address} />
+        <MyChogs me={me} />
 
         {me.swap && <Swap address={me.address} monBalance={me.mon.balance} isPasskey={isPasskey} />}
 
@@ -220,6 +222,94 @@ function WalletCard({ me, isPasskey }: { me: Me; isPasskey: boolean }) {
   );
 }
 
+/**
+ * Every Chog Genesis across the account's wallets, each one a tap away from
+ * the studio. If a wallet holds a Chog that cannot be listed, the holder adds
+ * it once by number and Dubu remembers it (re-checked onchain every time).
+ */
+function MyChogs({ me }: { me: Me }) {
+  const qc = useQueryClient();
+  const holderWallets = me.wallets.filter((w) => w.holder);
+  const [adding, setAdding] = useState(false);
+  const missing = holderWallets.length > 0 && me.tokens.length === 0;
+
+  return (
+    <section id="chogs" aria-label="Your Chog Genesis" className="scroll-mt-24">
+      <Panel className="mt-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-xl font-bold tracking-[-0.02em]">Your Chog Genesis</h2>
+            <p className="mt-1 text-sm text-mute">
+              {me.tokens.length
+                ? "Pick one and it goes straight into the studio."
+                : holderWallets.length
+                  ? "Your wallet holds a Chog Genesis. Add it once by its number and it stays here."
+                  : "Link the wallet that holds your Chog Genesis and it shows up here, ready for the studio."}
+            </p>
+          </div>
+        </div>
+
+        {me.tokens.length > 0 && (
+          <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {me.tokens.map((t) => (
+              <li key={t.tokenId}>
+                <Link
+                  href={`/studio?chog=${encodeURIComponent(t.tokenId)}`}
+                  className="group block rounded-3xl focus-visible:outline-2"
+                  aria-label={`Make a video with ${t.name}`}
+                >
+                  <ChogTile tokenId={t.tokenId} image={t.image} alt={t.name} />
+                  <p className="mt-2 truncate font-semibold">{t.name}</p>
+                  <p className="flex items-center justify-between gap-2 text-sm text-mute">
+                    <span className="truncate tabular-nums">{t.owner ? `In ${short(t.owner)}` : ""}</span>
+                    <span className="shrink-0 font-semibold text-brand group-hover:text-brand-press">Make a video</span>
+                  </p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {holderWallets.length === 0 ? (
+          <a href="#linked" className={`${buttonClass("ghost")} mt-5`}>
+            Link a wallet
+          </a>
+        ) : missing || adding ? (
+          <div className="mt-5 rounded-2xl bg-surface p-4">
+            <TokenIdLoader
+              onLoaded={() => {
+                setAdding(false);
+                qc.invalidateQueries({ queryKey: ["me"] });
+              }}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="mt-4 inline-flex h-11 items-center text-sm font-semibold text-brand hover:text-brand-press"
+          >
+            Missing one? Add it by number
+          </button>
+        )}
+      </Panel>
+    </section>
+  );
+}
+
+/** Dubu's image route first; the token's own image if that route cannot load it. */
+function ChogTile({ tokenId, image, alt }: { tokenId: string; image: string; alt: string }) {
+  const [direct, setDirect] = useState(false);
+  return (
+    <ChogFrame
+      tokenId={tokenId}
+      src={direct && image ? image : `/api/chogs/${tokenId}/image`}
+      alt={alt}
+      onError={() => setDirect(true)}
+    />
+  );
+}
+
 /** Level, what unlocks the next one, and today's videos. */
 function LevelCard({ me, nftWallet }: { me: Me; nftWallet?: string }) {
   const remaining = Math.max(0, me.limit - me.used);
@@ -308,6 +398,7 @@ function LinkedWallets({
         body: upgraded
           ? `${short(wallet.toLowerCase())} is linked. Your level is now ${TIER_NAME[me.tier]}.`
           : `${short(wallet.toLowerCase())} now counts toward your level.`,
+        ...(me.tokens.length ? { action: { label: "See your Chogs", href: "/profile#chogs" } } : {}),
       });
       disconnect(); // the passkey session stays; the wallet was only needed to sign
     },
@@ -373,7 +464,7 @@ function LinkedWallets({
     <Panel className="mt-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h2 className="font-display text-xl font-bold tracking-[-0.02em]">Linked wallets</h2>
+          <h2 id="linked" className="scroll-mt-24 font-display text-xl font-bold tracking-[-0.02em]">Linked wallets</h2>
           <p className="mt-1 max-w-[34rem] text-sm leading-relaxed text-mute">
             Hold your Chog Genesis or CHOG in another wallet? Link it and Dubu counts it toward your level. You stay
             signed in with this account. Nothing moves and there is no gas.
