@@ -36,6 +36,8 @@
   "overrides": {
     "@category-labs/mera": {
       "@wagmi/core": "2.22.1"
-    }
+    },
+    "postcss": "8.5.31",
+    "ws@^8.0.0": "8.22.0"
   }
 }

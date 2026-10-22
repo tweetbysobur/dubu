@@ -3,7 +3,7 @@ import { getSessionAddress } from "@/lib/session";
 import { getStanding, monBalance } from "@/lib/standing";
 import { accountAddresses } from "@/lib/links";
 import { dailyLimit, TIER_INFO } from "@/lib/tiers";
-import { getUsed } from "@/lib/limits";
+import { getUsed, softBurst } from "@/lib/limits";
 import { MOCK } from "@/lib/video";
 import { fail } from "@/lib/http";
 import { swapAvailableFor } from "@/lib/swap";
@@ -14,6 +14,8 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const address = await getSessionAddress();
   if (!address) return fail(401, "Not signed in.");
+  // Pages poll this every few seconds; this only stops a runaway loop from hammering the chain.
+  if (!(await softBurst(`me:${address}`, 90, 60_000))) return fail(429, "Too many requests. Wait a minute.");
 
   let status;
   // MON is only read for the sign-in wallet: it is the one that can swap. A failed read shows as unknown.
