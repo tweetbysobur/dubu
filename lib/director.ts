@@ -3,17 +3,24 @@ import { fetchImage } from "./images";
 import type { Tier } from "./tiers";
 
 /**
- * The director: one Claude call before each render. It looks at the image and
+ * The director: one language-model call before each render. It looks at the image and
  * the user's sentence and writes the shot the video model gets: one clear
  * action, a camera move, light and mood, the same character from start to end.
  * For uploads it also says whether the image is usable at all, so a bad image
  * costs no video credit.
  *
- * Off when ANTHROPIC_API_KEY is unset. Any failure (timeout, outage, odd reply)
+ * Off when no director key is set. Any failure (timeout, outage, odd reply)
  * falls back to the user's own sentence, so videos never stop because of it.
  */
 
-const API = `${(process.env.ANTHROPIC_BASE_URL?.trim() || "https://api.anthropic.com").replace(/\/$/, "")}/v1/messages`;
+// The provider's Messages API. DIRECTOR_API_URL points it elsewhere, for tests.
+const API = `${(process.env.DIRECTOR_API_URL?.trim() || "https://api.anthropic.com").replace(/\/$/, "")}/v1/messages`;
+const DEFAULT_MODEL = "claude-haiku-5-5";
+
+/** DIRECTOR_API_KEY, or the provider's own variable name for older setups. */
+function apiKey() {
+  return process.env.DIRECTOR_API_KEY?.trim() || process.env.ANTHROPIC_API_KEY?.trim() || "";
+}
 const TIMEOUT_MS = 15_000;
 const MAX_SHOT = 1400;
 
@@ -37,11 +44,11 @@ export function expandPrompt(prompt: string, chog?: ChogToken | null) {
 }
 
 export function directorEnabled() {
-  return !!process.env.ANTHROPIC_API_KEY?.trim();
+  return !!apiKey();
 }
 
 function model() {
-  return process.env.DIRECTOR_MODEL?.trim() || "claude-haiku-5-5";
+  return process.env.DIRECTOR_MODEL?.trim() || DEFAULT_MODEL;
 }
 
 export type Direction =
@@ -114,7 +121,7 @@ export async function direct(args: { prompt: string; image: string; tier: Tier; 
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY!.trim(),
+        "x-api-key": apiKey(),
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({

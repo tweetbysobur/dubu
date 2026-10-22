@@ -1,95 +1,97 @@
 # Dubu
 
-Turn your Chog into a short AI video. Built on Monad.
+**Your Chog, in motion.** Upload your Chog Genesis NFT, or any image, say what it should do, and get a short video or GIF of exactly that. Built on Monad.
 
-Connect a wallet, sign once to prove you own it, write a prompt, get a clip. Chog holders get their own Chog auto-loaded, trait-aware prompts, higher quality, a higher daily limit and no watermark. Everyone else uploads an image and gets the basic version.
+**Live:** [dubuai.vercel.app](https://dubuai.vercel.app) · **Docs:** [dubuai.vercel.app/docs](https://dubuai.vercel.app/docs)
 
-## Run it
+![Dubu landing page](docs/images/landing.png)
 
-```bash
-npm install
-cp .env.example .env.local
-npm run dev
-```
+## What it does
 
-Video provider: deAPI when `DEAPI_API_KEY` is set (free $5 credit at signup, no card), else Replicate when `REPLICATE_API_TOKEN` is set, else demo mode, which returns a sample clip after about 8 seconds. The UI says when it is in demo mode. `/api/health` shows which provider is active.
-
-## Config
-
-| Variable | What it does |
-| --- | --- |
-| `NEXT_PUBLIC_MONAD_NETWORK` | `mainnet` (chain 143) or `testnet` (chain 10143) |
-| `SESSION_SECRET` | Signs the session cookie. 32+ chars. Required in production |
-| `NEXT_PUBLIC_WC_PROJECT_ID` | WalletConnect project ID. Injected wallets work without it |
-| `CHOG_TOKEN_ADDRESS` / `CHOG_TOKEN_MIN` | CHOG token on Monad (`0x3500...7777`) and the minimum for the CHOG holder level. Empty minimum keeps that level off |
-| `CHOG_CONTRACT_ADDRESS` | Chog Genesis ERC-721, `0xc96d31f8626c6d03fae5dcd3d61e3fb9f4a73763` on mainnet. Without it, every wallet is free tier |
-| `ALCHEMY_API_KEY` | Lists token IDs when the contract is not ERC721Enumerable |
-| `DEAPI_API_KEY` | deAPI key (free credits). Takes priority over Replicate. Server only |
-| `VIDEO_MODEL` | deAPI video model. Default LTX-2.3 22B distilled at 8 steps, 121 frames, 24 fps. Sizes come from the model's presets, matched to the image's shape: up to 768 px free, up to 1024 px for holders. Falls back to LTX-Video 13B if deAPI refuses the default. The old `DEAPI_MODEL`, `DEAPI_SIZE_*`, `DEAPI_FRAMES`, `DEAPI_FPS` and `DEAPI_STEPS` are no longer read |
-| `ANTHROPIC_API_KEY` / `DIRECTOR_MODEL` | Turns on the director (Claude) that writes each shot. Server only |
-| `REPLICATE_API_TOKEN` | Replicate key (paid). Server only |
-| `REPLICATE_MODEL` | Image-to-video model. Default `wan-video/wan-2.2-i2v-fast` |
-| `REPLICATE_INPUT_HOLDER` / `_FREE` | Extra model inputs per tier, as JSON |
-| `HOLDER_DAILY_LIMIT` / `FREE_DAILY_LIMIT` | Generations per wallet per UTC day. Defaults 50 and 3 |
-| `DEMO_HOLDER_ADDRESSES` / `DEMO_CHOG_IMAGE_URL` | Treat listed wallets as holders for a demo |
-
-## Director
-
-When `ANTHROPIC_API_KEY` is set, one Claude call runs before each render (`lib/director.ts`). It sees the image and the user's sentence and writes the shot the video model gets: one action that fits the clip, a camera move, light and mood, and the same character from start to end. For a Genesis holder it also works in the Chog's name and traits. For uploads it first decides whether the image can be animated, and a refused image costs no video.
-
-It runs after the daily quota is reserved, so it is rate limited like generation. If Claude is slow, down or replies oddly, the user's own sentence goes to the video model instead. Users can turn it off per video in the studio. The result page shows both the user's idea and the shot. `DIRECTOR_MODEL` picks the model (default `claude-haiku-5-5`).
-
-## Sign-in
-
-Two ways, both end in the same signed server session:
-
-- **Passkey (default).** [Mera](https://github.com/category-labs/mera) (`@category-labs/mera`, pinned to 0.3.0) turns a passkey's PRF output into a standard EVM account (BIP-39 entropy, path `m/44'/60'/0'/0/0`, same as MetaMask). Face ID or a fingerprint creates the wallet on first use and reopens it after. The key exists only in the tab, only long enough to sign the login message, then it is wiped. No backend, no API key, no custody, no transactions.
-- **External wallet.** RainbowKit, for Chog holders whose Chog lives in an existing wallet. Connecting prompts the sign-in signature straight away.
-
-Passkey wallets can be exported from Profile: after a fresh passkey prompt, Dubu shows the 24-word recovery phrase (the PRF output as BIP-39 entropy) and the private key, after checking both open the account's address. Nothing is sent to the server or stored, and the view hides itself after two minutes.
-
-Passkeys are bound to the site's hostname (`dubuai.vercel.app`). Moving to another domain means passkeys from the old one stop working there, so plan any domain move before users store anything in a passkey wallet.
-
-Mera 0.3 declares an optional peer on `@wagmi/core` v3 for its wagmi connector, which Dubu does not use. An npm `overrides` entry pins that peer to the project's wagmi v2 so the install resolves.
+- **Image to video.** One image and one sentence give a clip of about 5 seconds. Download it as a video or a GIF.
+- **Holder mode.** Chog Genesis holders get their own Chog loaded in, with its traits worked into the shot, sharper video, no watermark and more videos a day.
+- **A director for every shot.** Before each render, a language model looks at the image and the sentence and writes a full shot for the video model: the action in order, small movements, one camera move, the same look. The result page shows both.
+- **Passkey wallets.** Sign in with Face ID or a fingerprint. No app, no seed phrase, no gas. Or connect any EVM wallet that supports Monad.
+- **Linked wallets.** Keep your Chog in a cold wallet and link it. Dubu counts everything your linked wallets hold.
+- **Swap.** Buy and sell CHOG with MON. Dubu quotes Nad.fun and Uniswap and uses the better price.
+- **Deposit and notifications.** A deposit page with a QR code, and alerts for deposits, swaps and finished videos.
 
 ## Levels
 
-| Level | Unlocks with | Gets |
-| --- | --- | --- |
-| Genesis holder | A Chog Genesis NFT in any linked wallet | Own Chog loaded in, trait-aware prompt, sharper video, no watermark, `HOLDER_DAILY_LIMIT` (50) a day |
-| CHOG holder | At least `CHOG_TOKEN_MIN` CHOG summed across linked wallets | Upload any image, sharper video, no watermark, `TOKEN_DAILY_LIMIT` (10) a day |
-| Free | Signing in | Upload any image, standard video, watermark, `FREE_DAILY_LIMIT` (3) a day |
+| Level | Unlocks with | Videos a day | Video | Watermark |
+| --- | --- | --- | --- | --- |
+| Genesis holder | A Chog Genesis NFT in any linked wallet | 50 | Up to 1024 px, own Chog | No |
+| CHOG holder | `CHOG_TOKEN_MIN` CHOG across linked wallets | 10 | Up to 1024 px, any image | No |
+| Free | Signing in | 3 | Up to 768 px, any image | Yes |
 
-The CHOG holder level stays off until `CHOG_TOKEN_MIN` is set. Balances are still read and shown on Profile when `CHOG_TOKEN_ADDRESS` is set. The level is re-checked on every generation.
+Limits are settings. The level is checked onchain on every video, and the browser never decides it.
 
-## Linked wallets
+## How a video is made
 
-From Profile, a signed-in account can link up to 3 more wallets. The wallet being linked signs a link message (worded differently from the sign-in message, so neither signature works as the other). Holder mode counts Chogs across the sign-in wallet and every linked wallet, so a passkey user can link the wallet that holds their Chog instead of signing in with it.
+1. The studio sends the image and the sentence. Holders pick a Chog; the server loads its art and traits itself.
+2. The server re-checks the level, reserves one video from the daily quota and applies the burst limits.
+3. The director writes the shot and screens uploads. A refused image gives the video back. If the director is off or slow, a structured version of the user's own sentence is used.
+4. [deAPI](https://deapi.ai) renders it with LTX-2.3 (22B distilled, 8 steps, 121 frames at 24 fps), at a preset size that matches the image's shape. If the model is refused, it falls back to LTX-Video 13B.
+5. The browser polls a signed job token and plays the video through Dubu, never from the provider directly.
+6. Free downloads get the watermark burned in, in the browser. GIFs are made in the browser too.
 
-A wallet can be linked to one Dubu account at a time (`SET NX` claim in Redis), so one Chog cannot grant holder mode to many accounts. Unlinking releases it.
+## Stack
 
-## How it works
+Next.js 15 (App Router) · React 19 · Tailwind CSS 4 · wagmi, viem and RainbowKit · [Mera](https://github.com/category-labs/mera) passkey wallets · Upstash Redis · deAPI · Vercel
 
-1. The user signs in with a passkey, or connects a wallet with RainbowKit on Monad.
-2. The account signs a nonce message. `/api/auth/verify` checks it with viem (EOAs and EIP-1271 smart wallets) and sets an httpOnly session cookie.
-3. `/api/me` reads `balanceOf` on the Chog contract for the signed-in wallet, then lists its tokens (ERC721Enumerable, then Alchemy) and loads metadata, image and traits. If neither can list them, the holder enters a token ID and `/api/token/:id` accepts it only when `ownerOf` matches the wallet.
-4. `/api/generate` re-checks ownership on every call. The client never decides the tier. Holders can only pick a token they own. Traits are appended to the prompt.
-5. The server calls Replicate. The browser polls `/api/jobs/:id` and plays the video from `/api/jobs/:id/video`, which streams through the backend. The browser never talks to the provider.
-6. Free-tier downloads get the watermark burned in client-side (WebM). Holder downloads are the original MP4.
-7. Any video can also be saved as a GIF, made in the browser (`lib/gif.ts`): 12 frames a second, up to 480 px wide, one shared palette, same watermark rule.
+## Run it locally
 
-## Limits
+```bash
+npm install
+cp .env.example .env.local   # fill in what you need
+npm run dev
+```
 
-- Daily quota per wallet, by tier.
-- Daily cap on free videos per network (`FREE_IP_DAILY_LIMIT`, default 6), because passkey wallets cost nothing to create.
-- Burst limit: 3 valid generations per wallet per minute, 6 per IP.
-- Sign-in endpoints are rate limited per IP.
+With no video key, Dubu runs in demo mode and returns a sample clip after a few seconds. `/api/health` shows what is configured.
 
-Counters live in Upstash Redis when `KV_REST_API_URL` and `KV_REST_API_TOKEN` are set (Vercel Marketplace, Upstash integration, sets both). Without them, counters fall back to process memory, which is fine locally but does not hold on Vercel, where each request can hit a different instance.
+## Configuration
 
-Generation fails closed if Redis is unreachable. Sign-in rate limits fail open, so an outage does not lock users out.
+Every value lives in the environment. `.env.example` lists them all with notes.
 
-Jobs need no storage. The job ID is a signed token (HMAC with `SESSION_SECRET`) carrying the provider ID, wallet, tier and prompt, so any instance can serve it. Tokens expire after 24 hours.
+| Area | Variables |
+| --- | --- |
+| Chain | `NEXT_PUBLIC_MONAD_NETWORK` (mainnet or testnet), `MONAD_RPC_URL` |
+| Sessions | `SESSION_SECRET`, 32+ characters, required in production |
+| Wallets | `NEXT_PUBLIC_WC_PROJECT_ID` for WalletConnect |
+| Chog Genesis | `CHOG_CONTRACT_ADDRESS`, `ALCHEMY_API_KEY` (lists a wallet's Chogs), `IPFS_GATEWAY` |
+| CHOG token | `CHOG_TOKEN_ADDRESS`, `CHOG_TOKEN_MIN` (empty keeps the CHOG holder level off) |
+| Video | `DEAPI_API_KEY`, `VIDEO_MODEL` |
+| Director | `DIRECTOR_API_KEY`, `DIRECTOR_MODEL` |
+| Storage | `KV_REST_API_URL`, `KV_REST_API_TOKEN` (set by the Upstash integration on Vercel) |
+| Limits | `HOLDER_DAILY_LIMIT`, `TOKEN_DAILY_LIMIT`, `FREE_DAILY_LIMIT`, `FREE_IP_DAILY_LIMIT` |
+| Swap | `SWAP_ENABLED`, `SWAP_CANARY_ADDRESSES`, `SWAP_MIN_MON`, `SWAP_MAX_MON`, `SWAP_MIN_CHOG`, `SWAP_MAX_CHOG`, `WMON_ADDRESS`, `NADFUN_LENS`, `NADFUN_BONDING_ROUTER`, `NADFUN_DEX_ROUTER`, `UNISWAP_V3_ROUTER`, `UNISWAP_V3_QUOTER` |
+| Landing | `SHOWCASE_CHOG_IDS`, `CHOG_TOKEN_LOGO_URL` |
+
+## Security
+
+- **No custody.** A passkey wallet's key is derived on the device from the passkey's PRF output, used for one signature, then wiped. Dubu never stores or receives it. Users can export the recovery phrase from Profile.
+- **Sessions.** Signing in is a signed message, checked on the server (EOAs and smart wallets). The session is an httpOnly, signed cookie.
+- **Levels.** Ownership and balances are read onchain on every video. A saved Chog is re-checked with `ownerOf` on every read, so a sold Chog drops off.
+- **Linked wallets.** Each link is proved by a signature from that wallet, and a wallet can belong to one account at a time.
+- **Swaps.** The server builds every call with the user as the only recipient. Before anything is broadcast, it decodes the call again and refuses anything else: only the configured routers, CHOG in or out, a real minimum, and no MON attached to approvals or sales. A sale approves exactly the amount being sold.
+- **Limits.** Daily quotas per account, a daily cap on free videos per network, burst limits on generation, and rate limits on sign-in, quotes, swaps, images and account reads. Generation fails closed if Redis is down; sign-in fails open.
+- **Headers.** The site cannot be framed by another site, and content types are enforced.
+
+## Project layout
+
+```
+app/            pages (landing, studio, result, profile, swap, deposit, docs, faq) and API routes
+components/     UI: studio, sign-in, swap, header, notifications, Chog frames
+lib/            server and shared logic
+  chog.ts       Chog Genesis ownership, metadata and images
+  standing.ts   levels across linked wallets
+  director.ts   the shot writer and upload screening
+  video.ts      deAPI jobs and fallbacks
+  swap.ts       quotes, call building and the swap guard
+  passkey.ts    passkey wallets on the device
+  limits.ts     quotas and rate limits
+scripts/        end-to-end checks against a running server
+```
 
 ## Checks
 
@@ -97,11 +99,12 @@ Jobs need no storage. The job ID is a signed token (HMAC with `SESSION_SECRET`) 
 npm run typecheck
 npm run build
 SESSION_SECRET=$(openssl rand -hex 32) npm start
-npm run smoke   # in another terminal, demo mode
+npm run smoke        # in another terminal, demo mode
 ```
 
-`scripts/cross-instance.mjs` runs against two servers sharing one Redis and checks that jobs and quotas work across instances.
+`scripts/` also holds checks for levels, linked wallets, the free-video network cap, a real provider run, and jobs and quotas across two server instances.
 
-## Out of scope
+## Notes
 
-User accounts, galleries, token payments, editing, multiple models.
+- Passkeys are bound to the site's domain. Moving domains means existing passkeys stop working there, so plan any move before users rely on them.
+- The Chog Genesis contract cannot list a wallet's tokens onchain. Without `ALCHEMY_API_KEY`, holders add their Chog once by its number.
