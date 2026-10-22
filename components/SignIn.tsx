@@ -32,6 +32,10 @@ export function SignIn({ session }: { session: Session }) {
   const [switching, setSwitching] = useState(false);
   const [confirmForget, setConfirmForget] = useState<string | null>(null);
   const [confirmNew, setConfirmNew] = useState(false);
+  // With no account remembered here, the main button looks for an existing Dubu
+  // passkey first. Creating one is always a separate, deliberate step, so a
+  // browser that lost its saved data never makes a second wallet by accident.
+  const [lookedUp, setLookedUp] = useState(false);
 
   const refresh = () => setAccounts(rememberedPasskeys());
   useEffect(() => {
@@ -47,6 +51,9 @@ export function SignIn({ session }: { session: Session }) {
   const busy = passkey.isPending;
   const error = passkey.error ?? walletSignIn.error;
   const current = accounts[0] ?? null;
+  // Safari reports "no passkey here" and "cancelled" the same way.
+  const noneFound =
+    !current && lookedUp && !!passkey.error && /cancelled|did not finish/.test(passkey.error.message);
 
   const walletButton = (variant: "primary" | "ghost") => (
     <ConnectButton.Custom>
@@ -81,7 +88,11 @@ export function SignIn({ session }: { session: Session }) {
           <button
             type="button"
             disabled={supported === null || busy}
-            onClick={() => passkey.mutate(current ? { credentialId: current.credentialId } : "create")}
+            onClick={() => {
+              if (current) return passkey.mutate({ credentialId: current.credentialId });
+              setLookedUp(true);
+              passkey.mutate("open-any");
+            }}
             className={`${buttonClass("primary", "lg")} w-full sm:w-auto`}
           >
             {busy ? (
@@ -190,20 +201,40 @@ export function SignIn({ session }: { session: Session }) {
           )}
         </div>
       ) : (
-        <>
-          <p className="mt-4 max-w-[34rem] text-sm leading-relaxed text-mute">
-            A passkey makes a free Dubu wallet on this device with Face ID or your fingerprint. No app, no seed phrase, no
-            gas. Hold a Chog? Connect the wallet it is in.
-          </p>
-          {supported && (
-            <button type="button" disabled={busy} onClick={() => passkey.mutate("open-any")} className={`${link} mt-2`}>
-              Already made a Dubu passkey? Use it
-            </button>
+        <div className="mt-4 max-w-[34rem]">
+          {noneFound ? (
+            <div className="rounded-2xl border border-line bg-white p-4">
+              <p className="font-semibold">No Dubu passkey was picked</p>
+              <p className="mt-1 text-sm leading-relaxed text-mute">
+                Made one before? Try again and choose it from the list. Your wallet is safe in your device&apos;s
+                passwords. New to Dubu? Create a passkey.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" disabled={busy} onClick={() => passkey.mutate("open-any")} className={buttonClass("ghost")}>
+                  Try again
+                </button>
+                <button type="button" disabled={busy} onClick={() => passkey.mutate("create")} className={buttonClass("primary")}>
+                  Create a new passkey
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm leading-relaxed text-mute">
+                Sign in with the passkey you made before, or make a free Dubu wallet with Face ID or your fingerprint. No app,
+                no seed phrase, no gas. Hold a Chog? Connect the wallet it is in.
+              </p>
+              {supported && (
+                <button type="button" disabled={busy} onClick={() => passkey.mutate("create")} className={`${link} mt-2`}>
+                  New to Dubu? Create a passkey
+                </button>
+              )}
+            </>
           )}
-        </>
+        </div>
       )}
 
-      {error && (
+      {error && !noneFound && (
         <div className="mt-3 max-w-[34rem]">
           <Alert>{error.message}</Alert>
         </div>
