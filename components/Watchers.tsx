@@ -9,8 +9,9 @@ import { useMe } from "@/lib/useSession";
 
 /**
  * Announces deposits. Balances are re-read every 20 seconds while signed in
- * (every 8 on the Deposit page). MON going up is a deposit. CHOG going up
- * counts only when MON did not go down at the same time, since that is a swap.
+ * (every 8 on the Deposit page). A balance going up is a deposit only when the
+ * other one did not go down at the same time: MON up with CHOG down is a sale,
+ * CHOG up with MON down is a buy, and the swap page announces those itself.
  */
 function DepositWatcher() {
   const pathname = usePathname();
@@ -33,7 +34,7 @@ function DepositWatcher() {
 
     const monUp = mon - prev.mon;
     const chogUp = chog - prev.chog;
-    if (monUp > 0) {
+    if (monUp > 0 && chogUp >= 0) {
       notify({
         tone: "celebrate",
         token: "mon",
@@ -41,7 +42,7 @@ function DepositWatcher() {
         body: `Your wallet now holds ${formatMon(String(mon))} MON.`,
         ...(pathname !== "/profile" ? { action: { label: "View wallet", href: "/profile" } } : {}),
       });
-    } else if (chogUp > 0 && monUp === 0) {
+    } else if (chogUp > 0 && monUp >= 0) {
       notify({
         tone: "celebrate",
         token: "chog",

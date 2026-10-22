@@ -31,7 +31,7 @@ function items(t?: TierFacts): { q: string; a: string }[] {
     {
       q: "Does it cost gas?",
       a: t?.swap
-        ? "Making videos costs no gas. Swapping MON for CHOG in Profile is an on-chain trade, so it pays a small Monad network fee."
+        ? "Making videos costs no gas. Buying or selling CHOG on the Swap page is an onchain trade, so it pays a small Monad network fee."
         : "No. You only sign messages. Nothing moves.",
     },
   ];
