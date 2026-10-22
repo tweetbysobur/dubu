@@ -12,10 +12,18 @@ const COLORS = ["#1F4FFF", "#8FA8FF", "#6E54FF", "#0B1220", "#FFFFFF", "#FFB020"
 function Confetti() {
   const tick = useCelebrateTick();
   const ref = useRef<HTMLCanvasElement>(null);
+  // The layer only exists while confetti falls, so it can never add height or
+  // catch taps on any browser between celebrations.
+  const [active, setActive] = useState(false);
 
   useEffect(() => {
     if (tick === 0) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    setActive(true);
+  }, [tick]);
+
+  useEffect(() => {
+    if (!active) return;
     const canvas = ref.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
@@ -76,16 +84,18 @@ function Confetti() {
       }
       frame++;
       if (frame < total) raf = requestAnimationFrame(draw);
-      else ctx.clearRect(0, 0, w, h);
+      else setActive(false);
     };
     raf = requestAnimationFrame(draw);
-    return () => {
-      cancelAnimationFrame(raf);
-      ctx.clearRect(0, 0, w, h);
-    };
-  }, [tick]);
+    return () => cancelAnimationFrame(raf);
+  }, [active, tick]);
 
-  return <canvas ref={ref} aria-hidden className="pointer-events-none fixed inset-0 z-[60] size-full" />;
+  if (!active) return null;
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 z-[60] overflow-hidden">
+      <canvas ref={ref} className="absolute inset-0 h-full w-full" />
+    </div>
+  );
 }
 
 function ToastIcon({ toast }: { toast: Toast }) {

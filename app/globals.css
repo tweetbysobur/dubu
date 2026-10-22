@@ -123,3 +123,12 @@ body {
     animation: none;
   }
 }
+
+/* RainbowKit wraps the whole page in [data-rk]. Make that wrapper the page
+   column so the footer sits at the bottom and nothing adds height after it. */
+body > [data-rk] {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 100dvh;
+}
