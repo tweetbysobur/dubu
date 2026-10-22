@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { trackJob } from "@/lib/notify";
 import { LevelBadge } from "./LevelBadge";
+import { StudioTour } from "./StudioTour";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Me, type TierFacts } from "@/lib/api";
 import { Alert, Button, Container, Panel } from "@/components/ui";
@@ -105,7 +106,9 @@ export function Studio({ me }: { me: Me }) {
           </div>
         )}
 
-        <div className="mt-8 grid items-start gap-5 md:grid-cols-2 md:gap-6">
+        <TourPanel chog={hasChog && activeChog ? { src: activeChog.image, id: activeChog.tokenId } : null} />
+
+        <div className="mt-6 grid items-start gap-5 md:grid-cols-2 md:gap-6">
           <Panel>
             <h2 className="font-display text-xl font-bold tracking-[-0.02em]">{holder ? "Your Chog" : "Image"}</h2>
             <div className="mt-5">
@@ -183,5 +186,64 @@ export function Studio({ me }: { me: Me }) {
         </div>
       </Container>
     </main>
+  );
+}
+
+const TOUR_KEY = "dubu.tour";
+
+/** The walkthrough, open on first visit, folded away once someone hides it. */
+function TourPanel({ chog }: { chog: { src: string; id: string } | null }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    try {
+      setOpen(localStorage.getItem(TOUR_KEY) !== "hidden");
+    } catch {
+      setOpen(true);
+    }
+  }, []);
+  const showcase = useQuery<{ enabled: boolean; ids: string[] }>({
+    queryKey: ["showcase"],
+    queryFn: () => api("/api/showcase"),
+    staleTime: Infinity,
+    enabled: !chog,
+  });
+  const sampleId = showcase.data?.enabled ? showcase.data.ids[1] ?? showcase.data.ids[0] : null;
+  const src = chog?.src ?? (sampleId ? `/api/chogs/${sampleId}/image` : null);
+  const id = chog?.id ?? sampleId ?? "1";
+
+  function toggle(next: boolean) {
+    setOpen(next);
+    try {
+      localStorage.setItem(TOUR_KEY, next ? "open" : "hidden");
+    } catch {
+      // storage blocked: the choice lasts for this visit
+    }
+  }
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => toggle(true)} className="mt-6 inline-flex h-11 items-center gap-2 text-sm font-semibold text-brand hover:text-brand-press">
+        <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+        Watch how it works
+      </button>
+    );
+  }
+  return (
+    <Panel className="mt-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-display text-xl font-bold tracking-[-0.02em]">How it works</h2>
+          <p className="mt-1 text-sm text-mute">{chog ? "Your Chog, from idea to download." : "A Chog Genesis, from idea to download."} A walkthrough, not a real result.</p>
+        </div>
+        <button type="button" onClick={() => toggle(false)} className="h-10 shrink-0 rounded-xl px-3 text-sm font-semibold text-mute hover:bg-surface hover:text-ink">
+          Hide
+        </button>
+      </div>
+      <div className="mt-5">
+        <StudioTour chogSrc={src} chogId={id} />
+      </div>
+    </Panel>
   );
 }
