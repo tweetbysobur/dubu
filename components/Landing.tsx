@@ -87,7 +87,7 @@ function Hero({ session }: { session: ReturnType<typeof useSession> }) {
             in motion.
           </h1>
           <p className="mt-6 max-w-[32rem] text-[17px] leading-relaxed text-mute sm:text-lg">
-            Pick your Chog, write one sentence, get a short video. Chog Genesis holders get their own Chog loaded in,
+            Upload your Chog, say what it should do, and get a short video or GIF of exactly that. Chog Genesis holders get their own Chog loaded in,
             sharper video and no watermark. Everyone else can upload any image.
           </p>
           <div ref={ctaRef} id="sign-in" className="mt-8 scroll-mt-24">
@@ -120,13 +120,13 @@ function HowItWorks({ clipSeconds }: { clipSeconds: number | null }) {
     },
     {
       mood: "rolling",
-      title: "Describe a scene",
-      body: "Write one sentence, like “dancing in the rain”. Without a Chog, upload any image first.",
+      title: "Say what it does",
+      body: "Upload your NFT or any image, then write what it should do, like “waves with its left paw, then dances in the rain”.",
     },
     {
       mood: "done",
-      title: "Download your video",
-      body: `Watch it in the browser, then save it to your phone.${clipSeconds ? ` Each clip runs about ${clipSeconds} seconds.` : ""}`,
+      title: "Download the video or GIF",
+      body: `Watch it in the browser, then save it as a video or a GIF.${clipSeconds ? ` Each clip runs about ${clipSeconds} seconds.` : ""}`,
     },
   ];
 

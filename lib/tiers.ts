@@ -1,3 +1,4 @@
+import { videoProfile } from "./videoProfile";
 // Server-only tier facts. Every number shown in the UI comes from here, so it matches what the backend does.
 //
 // Three levels:
@@ -16,8 +17,8 @@ export function isSharp(tier: Tier) {
 
 function qualityLabel(tier: Tier): string {
   if (process.env.DEAPI_API_KEY) {
-    const px = isSharp(tier) ? process.env.DEAPI_SIZE_HOLDER || "768" : process.env.DEAPI_SIZE_FREE || "512";
-    return `${px} px`;
+    const sizes = videoProfile().sizes;
+    return `${Math.max(...(isSharp(tier) ? sizes.sharp : sizes.standard)[0])} px`;
   }
   if (process.env.REPLICATE_API_TOKEN) return isSharp(tier) ? "720p" : "480p";
   return "Sample clip";
@@ -26,9 +27,8 @@ function qualityLabel(tier: Tier): string {
 /** Clip length in seconds for the active provider, or null when unknown. */
 export function clipSeconds(): number | null {
   if (!process.env.DEAPI_API_KEY) return null;
-  const frames = Number(process.env.DEAPI_FRAMES || 120);
-  const fps = Number(process.env.DEAPI_FPS || 30);
-  return fps > 0 ? Math.round(frames / fps) : null;
+  const p = videoProfile();
+  return Math.round(p.frames / p.fps);
 }
 
 export const TIER_INFO: Record<Tier, TierInfo> = {

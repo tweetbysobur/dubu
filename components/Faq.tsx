@@ -10,7 +10,7 @@ function items(t?: TierFacts): { q: string; a: string }[] {
   return [
     {
       q: "What is Dubu?",
-      a: "Dubu turns one image and one sentence into a short video. Chog holders get more.",
+      a: "Upload your Chog or any image and say what it should do. Dubu turns it into a short video or GIF of exactly that. Chog holders get more.",
     },
     {
       q: "Do I need a Chog?",

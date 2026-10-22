@@ -45,6 +45,16 @@ export default function ResultPage() {
     },
   });
 
+  const gif = useMutation({
+    mutationFn: async () => {
+      const data = job.data!;
+      const res = await fetch(data.videoUrl!, { credentials: "same-origin" });
+      if (!res.ok) throw new Error("Dubu could not download the video. Try again.");
+      const { videoToGif } = await import("@/lib/gif");
+      saveBlob(await videoToGif(await res.blob(), { watermark: data.watermark ? "Made with Dubu" : undefined }), `dubu-${fileStamp()}.gif`);
+    },
+  });
+
   const failed = job.data?.status === "failed";
   const done = job.data?.status === "succeeded" && !!job.data.videoUrl;
   const mood: Mood = job.isError || failed ? "oops" : done ? "done" : "rolling";
@@ -151,14 +161,17 @@ export default function ResultPage() {
                 <Button size="lg" loading={download.isPending} onClick={() => download.mutate()}>
                   {download.isPending ? (job.data.watermark ? "Adding watermark" : "Preparing download") : "Download video"}
                 </Button>
+                <Button size="lg" variant="ghost" loading={gif.isPending} onClick={() => gif.mutate()}>
+                  {gif.isPending ? "Making the GIF" : "Download GIF"}
+                </Button>
                 <Link href="/studio" className={buttonClass("ghost", "lg")}>
                   Make another video
                 </Link>
               </div>
             </div>
-            {download.isError && (
+            {(download.isError || gif.isError) && (
               <div className="mt-4">
-                <Alert>{download.error.message}</Alert>
+                <Alert>{(download.error ?? gif.error)!.message}</Alert>
               </div>
             )}
           </div>

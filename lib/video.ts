@@ -1,5 +1,6 @@
 import { imageSize } from "image-size";
 import { isSharp, type Tier } from "./tiers";
+import { LTXV13, videoProfile, type Profile } from "./videoProfile";
 
 // Provider selection: deAPI (free credits at signup), then Replicate, then demo mode.
 const DEAPI_KEY = process.env.DEAPI_API_KEY;
@@ -63,45 +64,35 @@ async function loadImage(image: string): Promise<{ bytes: Buffer; type: string }
   return { bytes, type: res.headers.get("content-type")?.split(";")[0] || "image/png" };
 }
 
-/** Output size keeps the image's aspect ratio. Long side by tier, both sides multiples of 32. */
-function outputSize(bytes: Buffer, longSide: number) {
-  let w = 1;
-  let h = 1;
-  try {
-    const d = imageSize(bytes);
-    if (d.width && d.height) {
-      w = d.width;
-      h = d.height;
-    }
-  } catch {
-    // unknown format: fall back to square
-  }
-  const scale = longSide / Math.max(w, h);
-  const snap = (n: number) => Math.max(256, Math.round((n * scale) / 32) * 32);
-  return { width: snap(w), height: snap(h) };
-}
-
-function envInt(name: string, fallback: number) {
-  const n = Number(process.env[name]);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
-}
-
 // ---------- deAPI (https://docs.deapi.ai) ----------
 
-async function deapiCreate({ tier, image, prompt }: CreateArgs): Promise<string> {
-  const { bytes, type } = await loadImage(image);
-  const longSide = isSharp(tier) ? envInt("DEAPI_SIZE_HOLDER", 768) : envInt("DEAPI_SIZE_FREE", 512);
-  const { width, height } = outputSize(bytes, longSide);
+/** The preset closest to the image's shape, so nothing is squashed. */
+function presetSize(bytes: Buffer, options: [number, number][]) {
+  let ratio = 1;
+  try {
+    const d = imageSize(bytes);
+    if (d.width && d.height) ratio = d.width / d.height;
+  } catch {
+    // unknown format: square
+  }
+  let best = options[0];
+  for (const o of options) {
+    if (Math.abs(Math.log(o[0] / o[1] / ratio)) < Math.abs(Math.log(best[0] / best[1] / ratio))) best = o;
+  }
+  return { width: best[0], height: best[1] };
+}
 
+async function deapiSubmit(profile: Profile, { tier, bytes, type, prompt }: { tier: Tier; bytes: Buffer; type: string; prompt: string }) {
+  const { width, height } = presetSize(bytes, isSharp(tier) ? profile.sizes.sharp : profile.sizes.standard);
   const form = new FormData();
-  form.append("model", process.env.DEAPI_MODEL || "Ltxv_13B_0_9_8_Distilled_FP8");
+  form.append("model", profile.model);
   form.append("prompt", prompt);
   form.append("width", String(width));
   form.append("height", String(height));
-  form.append("frames", String(envInt("DEAPI_FRAMES", 120)));
-  form.append("fps", String(envInt("DEAPI_FPS", 30)));
-  form.append("steps", String(envInt("DEAPI_STEPS", 1)));
-  form.append("guidance", process.env.DEAPI_GUIDANCE || "1");
+  form.append("frames", String(profile.frames));
+  form.append("fps", String(profile.fps));
+  form.append("steps", String(profile.steps));
+  form.append("guidance", profile.guidance);
   form.append("seed", String(Math.floor(Math.random() * 2_147_483_647)));
   const ext = type.split("/")[1] || "png";
   form.append("first_frame_image", new Blob([new Uint8Array(bytes)], { type }), `frame.${ext}`);
@@ -113,6 +104,21 @@ async function deapiCreate({ tier, image, prompt }: CreateArgs): Promise<string>
     signal: AbortSignal.timeout(60_000),
   });
   const data = await res.json().catch(() => ({}));
+  return { res, data };
+}
+
+async function deapiCreate({ tier, image, prompt }: CreateArgs): Promise<string> {
+  const { bytes, type } = await loadImage(image);
+  const primary = videoProfile();
+  let { res, data } = await deapiSubmit(primary, { tier, bytes, type, prompt });
+
+  // If deAPI refuses the newer model's request (renamed slug, a size it does not take),
+  // run the job on the older model instead of failing the person's video.
+  if (!res.ok && res.status >= 400 && res.status < 500 && res.status !== 401 && res.status !== 402 && primary !== LTXV13) {
+    console.error("[deapi] primary model refused, using fallback", res.status, JSON.stringify(data).slice(0, 400));
+    ({ res, data } = await deapiSubmit(LTXV13, { tier, bytes, type, prompt }));
+  }
+
   if (!res.ok || !data?.data?.request_id) {
     // Log field errors so a wrong model setting is visible in Vercel logs
     console.error("[deapi] create failed", res.status, JSON.stringify(data).slice(0, 500));

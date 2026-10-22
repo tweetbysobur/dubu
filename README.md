@@ -25,7 +25,7 @@ Video provider: deAPI when `DEAPI_API_KEY` is set (free $5 credit at signup, no 
 | `CHOG_CONTRACT_ADDRESS` | Chog Genesis ERC-721, `0xc96d31f8626c6d03fae5dcd3d61e3fb9f4a73763` on mainnet. Without it, every wallet is free tier |
 | `ALCHEMY_API_KEY` | Lists token IDs when the contract is not ERC721Enumerable |
 | `DEAPI_API_KEY` | deAPI key (free credits). Takes priority over Replicate. Server only |
-| `DEAPI_MODEL` / `DEAPI_SIZE_*` / `DEAPI_FRAMES` / `DEAPI_FPS` / `DEAPI_STEPS` | deAPI model and output settings. Defaults: LTX-Video 13B distilled, 512 free / 768 holder, 120 frames at 30 fps |
+| `VIDEO_MODEL` | deAPI video model. Default LTX-2.3 22B distilled at 8 steps, 121 frames, 24 fps. Sizes come from the model's presets, matched to the image's shape: up to 768 px free, up to 1024 px for holders. Falls back to LTX-Video 13B if deAPI refuses the default. The old `DEAPI_MODEL`, `DEAPI_SIZE_*`, `DEAPI_FRAMES`, `DEAPI_FPS` and `DEAPI_STEPS` are no longer read |
 | `ANTHROPIC_API_KEY` / `DIRECTOR_MODEL` | Turns on the director (Claude) that writes each shot. Server only |
 | `REPLICATE_API_TOKEN` | Replicate key (paid). Server only |
 | `REPLICATE_MODEL` | Image-to-video model. Default `wan-video/wan-2.2-i2v-fast` |
@@ -76,6 +76,7 @@ A wallet can be linked to one Dubu account at a time (`SET NX` claim in Redis), 
 4. `/api/generate` re-checks ownership on every call. The client never decides the tier. Holders can only pick a token they own. Traits are appended to the prompt.
 5. The server calls Replicate. The browser polls `/api/jobs/:id` and plays the video from `/api/jobs/:id/video`, which streams through the backend. The browser never talks to the provider.
 6. Free-tier downloads get the watermark burned in client-side (WebM). Holder downloads are the original MP4.
+7. Any video can also be saved as a GIF, made in the browser (`lib/gif.ts`): 12 frames a second, up to 480 px wide, one shared palette, same watermark rule.
 
 ## Limits
 

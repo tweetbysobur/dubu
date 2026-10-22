@@ -17,7 +17,7 @@ import {
 import { createVideo } from "@/lib/video";
 import { encodeJob } from "@/lib/jobs";
 import { fail, readJson } from "@/lib/http";
-import { direct } from "@/lib/director";
+import { direct, expandPrompt } from "@/lib/director";
 
 const MAX_IMAGE_CHARS = 2_000_000; // ~1.5 MB after base64
 const DATA_URL = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
@@ -28,16 +28,6 @@ function cleanPrompt(p: unknown) {
   if (typeof p !== "string") return null;
   const s = p.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
   return s.length >= 3 && s.length <= 500 ? s : null;
-}
-
-function holderPrompt(prompt: string, token: ChogToken) {
-  const traits = token.traits.map((t) => `${t.trait_type.toLowerCase()}: ${t.value}`).join(", ");
-  return [
-    prompt,
-    `The main character is the Chog from the reference image (${token.name})`,
-    traits ? `with these traits: ${traits}.` : ".",
-    "Keep its exact face, colors and accessories. Cinematic lighting, smooth camera motion.",
-  ].join(" ");
 }
 
 export async function POST(req: Request) {
@@ -91,7 +81,7 @@ export async function POST(req: Request) {
     if (!token) return fail(403, "That Chog is not in your wallets.");
     image = token.image;
     chog = token;
-    finalPrompt = holderPrompt(prompt, token);
+
   } else {
     if (typeof body.image !== "string" || !DATA_URL.test(body.image)) {
       return fail(400, "Upload a PNG, JPG or WebP image.");
@@ -123,6 +113,7 @@ export async function POST(req: Request) {
 
   // The director writes the shot (and screens uploads) after the quota is reserved, so it is rate limited too.
   let shot: string | null = null;
+  finalPrompt = expandPrompt(prompt, chog);
   if (body.direct !== false) {
     const d = await direct({ prompt, image, tier, chog });
     if (d.kind === "rejected") {
@@ -132,7 +123,7 @@ export async function POST(req: Request) {
     }
     if (d.kind === "shot") {
       shot = d.shot;
-      finalPrompt = chog ? `${shot} Keep the Chog exactly as in the reference image: same face, colors and accessories.` : shot;
+      finalPrompt = shot;
     }
   }
 

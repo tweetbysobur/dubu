@@ -77,7 +77,7 @@ export function Studio({ me }: { me: Me }) {
           ? "Load your Chog first"
           : "Add an image first"
         : !promptOk
-          ? "Describe the scene first"
+          ? "Say what it should do first"
           : null;
 
   return (
@@ -135,16 +135,16 @@ export function Studio({ me }: { me: Me }) {
 
           <Panel className="md:sticky md:top-24">
             <label htmlFor="prompt" className="block font-display text-xl font-bold tracking-[-0.02em]">
-              Describe the scene
+              {hasChog ? "What should your Chog do?" : "What should it do?"}
             </label>
-            <p className="mt-1 text-sm text-mute">One sentence is enough.</p>
+            <p className="mt-1 text-sm text-mute">Say the action, plus any details you care about: where, which paw, how it feels.</p>
             <textarea
               id="prompt"
               rows={5}
               maxLength={500}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="dancing in the rain"
+              placeholder="waves with its left paw, then does a little happy dance in the rain"
               className="mt-4 w-full resize-none rounded-2xl border border-line bg-white px-4 py-3.5 text-base leading-relaxed outline-none placeholder:text-mute/70 focus:border-brand"
             />
             <p className="mt-2 text-right text-xs tabular-nums text-mute">{prompt.length}/500</p>
