@@ -170,11 +170,11 @@ function WalletCard({ me, isPasskey }: { me: Me; isPasskey: boolean }) {
     <section aria-label="Wallet" className="mt-8 overflow-hidden rounded-3xl bg-brand text-white">
       <div className="p-5 sm:p-7">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-medium text-white/80">{isPasskey ? "Passkey wallet" : "Sign-in wallet"} · Monad</p>
+          <p className="text-sm font-medium text-white/90">{isPasskey ? "Passkey wallet" : "Sign-in wallet"} · Monad</p>
           <button
             type="button"
             onClick={copy}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white/15 px-3 text-sm font-semibold tabular-nums hover:bg-white/25"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-brand-press px-3 text-sm font-semibold tabular-nums hover:bg-ink/40"
             aria-label={copied ? "Address copied" : `Copy address ${me.address}`}
           >
             {copied ? "Copied" : short(me.address)}
@@ -186,7 +186,7 @@ function WalletCard({ me, isPasskey }: { me: Me; isPasskey: boolean }) {
           <TokenIcon token="mon" size={40} className="ring-2 ring-white/30" />
           <p className="font-display text-[44px] font-extrabold leading-none tracking-[-0.04em] tabular-nums sm:text-[56px]">
             {mon === null ? "-" : formatMon(mon)}
-            <span className="ml-2 text-2xl font-bold tracking-[-0.02em] text-white/80 sm:text-3xl">MON</span>
+            <span className="ml-2 text-2xl font-bold tracking-[-0.02em] text-white/90 sm:text-3xl">MON</span>
           </p>
         </div>
         {me.chog.tracked && (
@@ -194,12 +194,12 @@ function WalletCard({ me, isPasskey }: { me: Me; isPasskey: boolean }) {
             <TokenIcon token="chog" size={22} />
             {formatChog(chog)} CHOG
             {me.wallets.length > 1 && (
-              <span className="font-medium text-white/70">· {formatChog(me.chog.balance)} across all wallets</span>
+              <span className="font-medium text-white/90">· {formatChog(me.chog.balance)} across all wallets</span>
             )}
           </p>
         )}
         {!funded && mon !== null && (
-          <p className="mt-4 text-sm leading-relaxed text-white/85">Add MON to buy CHOG and pay network fees.</p>
+          <p className="mt-4 text-sm leading-relaxed text-white/90">Add MON to buy CHOG and pay network fees.</p>
         )}
       </div>
 

@@ -216,7 +216,7 @@ function TierColumn({ tier, title, rows, featured }: { tier: TierId; title: stri
             key={label}
             className={`flex items-baseline justify-between gap-4 border-t py-3.5 ${featured ? "border-white/25" : "border-line"}`}
           >
-            <dt className={`whitespace-nowrap ${featured ? "text-white/80" : "text-mute"}`}>{label}</dt>
+            <dt className={`whitespace-nowrap ${featured ? "text-white/90" : "text-mute"}`}>{label}</dt>
             <dd className="text-right font-medium tabular-nums">{value}</dd>
           </div>
         ))}

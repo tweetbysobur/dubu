@@ -219,13 +219,13 @@ function MobileMenu({ links, me, signInHref }: { links: NavLink[]; me: Me | null
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold tabular-nums">{short(me.address)}</p>
-                  <p className="text-sm text-white/75">{TIER_NAME[me.tier]}</p>
+                  <p className="text-sm text-white/90">{TIER_NAME[me.tier]}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => copy(me.address)}
                   aria-label={copied ? "Address copied" : "Copy address"}
-                  className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-white/15 px-3 text-sm font-semibold hover:bg-white/25"
+                  className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-brand-press px-3 text-sm font-semibold hover:bg-ink/40"
                 >
                   {copied ? "Copied" : <Glyph d="M9 9h10v10H9zM5 15V5h10" size={18} />}
                 </button>
@@ -233,10 +233,10 @@ function MobileMenu({ links, me, signInHref }: { links: NavLink[]; me: Me | null
 
               <div className="mt-4 flex items-end justify-between gap-3 border-t border-white/15 pt-4">
                 <div className="min-w-0">
-                  <p className="text-sm text-white/75">Balance</p>
+                  <p className="text-sm text-white/90">Balance</p>
                   <p className="mt-0.5 flex items-center gap-2 font-display text-2xl font-bold tabular-nums">
                     <TokenIcon token="mon" size={24} />
-                    {me.mon.balance === null ? "-" : formatMon(me.mon.balance)} <span className="text-base text-white/80">MON</span>
+                    {me.mon.balance === null ? "-" : formatMon(me.mon.balance)} <span className="text-base text-white/90">MON</span>
                   </p>
                 </div>
                 {me.chog.tracked && (
@@ -260,7 +260,7 @@ function MobileMenu({ links, me, signInHref }: { links: NavLink[]; me: Me | null
                   <Link
                     href="/swap"
                     onClick={close}
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white/15 text-[15px] font-semibold text-white hover:bg-white/25"
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand-press text-[15px] font-semibold text-white hover:bg-ink/40"
                   >
                     <Glyph d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" size={18} />
                     Swap
