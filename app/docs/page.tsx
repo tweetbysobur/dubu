@@ -323,7 +323,9 @@ export default function DocsPage() {
                       Swap
                     </Link>{" "}
                     buys or sells CHOG with MON. Dubu compares Nad.fun and Uniswap and uses the better price. You see the
-                    minimum you will get before you confirm, and Max on a buy keeps a little MON back for network fees.
+                    minimum you will get before you confirm, and Max on a buy keeps a little MON back for network fees. On
+                    the free level, Swap shows how much CHOG you hold toward CHOG holder and can fill in the exact buy
+                    that gets you there, counted at the worst price your slippage allows.
                   </p>
                   <p>
                     Every swap takes one confirmation. On Nad.fun, a sale carries a signature that lets the router use

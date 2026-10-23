@@ -319,6 +319,31 @@ function toQuote(side: Side, r: { best: Route; nad: Route | null; uni: Route | n
   };
 }
 
+/**
+ * The MON to spend so that even the worst fill (the slippage floor) brings at least
+ * `target` CHOG. Used to fill in a buy that reaches the CHOG holder level. Starts from
+ * the price of a small probe, then corrects against real quotes, so the curve's price
+ * movement is included. Rounded up to 0.0001 MON.
+ */
+export async function monForChog(target: bigint, slippageBps: number): Promise<Quote> {
+  const d = await decimals();
+  const step = 10n ** 14n;
+  const roundUp = (x: bigint) => ((x + step - 1n) / step) * step;
+  const max = parseMonAmount(String(SWAP_LIMITS.maxMon));
+  const min = parseMonAmount(String(SWAP_LIMITS.minMon));
+  let amountIn = min > 10n ** 17n ? min : 10n ** 17n;
+  for (let i = 0; i < 6; i++) {
+    const r = await routeOrThrow("buy", amountIn);
+    const floor = minOut(r.best.amountOut, slippageBps);
+    if (floor >= target) return toQuote("buy", r, amountIn, slippageBps, d);
+    let next = roundUp((amountIn * target) / (floor > 0n ? floor : 1n) + amountIn / 500n + 1n);
+    if (next <= amountIn) next = amountIn + step;
+    if (next > max) throw new SwapError(`That needs more than ${SWAP_LIMITS.maxMon} MON in one swap. Buy in two steps.`);
+    amountIn = next < min ? min : next;
+  }
+  throw new SwapError("The price is moving too fast to work that out. Try again in a moment.");
+}
+
 export async function quote(side: Side, amountIn: bigint, slippageBps: number): Promise<Quote> {
   const [r, d] = await Promise.all([routeOrThrow(side, amountIn), decimals()]);
   return toQuote(side, r, amountIn, slippageBps, d);

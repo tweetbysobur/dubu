@@ -56,6 +56,34 @@ function DepositWatcher() {
   return null;
 }
 
+const RANK = { free: 0, token: 1, holder: 2 } as const;
+
+/** Announces a level going up, for example right after buying enough CHOG on the Swap page. */
+function LevelWatcher() {
+  const me = useMe();
+  const last = useRef<{ address: string; tier: keyof typeof RANK } | null>(null);
+  const d = me.data;
+
+  useEffect(() => {
+    if (!d) {
+      last.current = null;
+      return;
+    }
+    const prev = last.current;
+    last.current = { address: d.address, tier: d.tier };
+    if (!prev || prev.address !== d.address || RANK[d.tier] <= RANK[prev.tier]) return;
+    notify({
+      tone: "celebrate",
+      token: d.tier === "token" ? "chog" : undefined,
+      title: `You are a ${d.label} now`,
+      body: `${d.limit} videos a day, ${d.quality}${d.watermark ? "" : ", no watermark"}.`,
+      action: { label: "Make a video", href: "/studio" },
+    });
+  }, [d]);
+
+  return null;
+}
+
 /** Announces a finished video wherever the user is on the site. */
 function JobWatcher() {
   const pathname = usePathname();
@@ -111,6 +139,7 @@ export function Watchers() {
   return (
     <>
       <DepositWatcher />
+      <LevelWatcher />
       <JobWatcher />
     </>
   );

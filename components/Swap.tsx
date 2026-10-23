@@ -89,11 +89,14 @@ export function Swap({
   monBalance,
   chogBalance,
   isPasskey,
+  upgrade,
 }: {
   address: string;
   monBalance: string | null;
   chogBalance: string | null;
   isPasskey: boolean;
+  /** Set for a free account when CHOG holder is in reach: what it holds, the minimum, the shortfall, the perks. */
+  upgrade?: Upgrade | null;
 }) {
   const qc = useQueryClient();
   const [side, setSide] = useState<Side>("buy");
@@ -274,6 +277,16 @@ export function Swap({
     },
   });
 
+  /** Fills in the buy that reaches CHOG holder even at the slippage floor. The person still reviews and confirms. */
+  const fill = useMutation<Quote, ApiError>({
+    mutationFn: () => api<Quote>(`/api/swap/quote?forChog=${encodeURIComponent(upgrade!.need)}&slippageBps=${slippage}`),
+    onSuccess: (q) => {
+      reset();
+      setSide("buy");
+      setAmount(q.amountIn);
+    },
+  });
+
   function reset() {
     setSent(null);
     setReview(null);
@@ -388,6 +401,14 @@ export function Swap({
         </div>
       ) : (
         <div>
+          {upgrade && (
+            <UpgradeBar
+              upgrade={upgrade}
+              busy={fill.isPending}
+              error={fill.error?.message ?? null}
+              onFill={() => fill.mutate()}
+            />
+          )}
           <div role="tablist" aria-label="Swap direction" className="grid grid-cols-2 gap-1 rounded-2xl bg-surface p-1">
             {(["buy", "sell"] as const).map((s) => (
               <button
@@ -649,4 +670,38 @@ function toTx(b: TxStep): PasskeyTx {
     maxPriorityFeePerGas: BigInt(b.tx.maxPriorityFeePerGas),
     chainId: b.tx.chainId,
   };
+}
+
+export type Upgrade = { have: string; min: string; need: string; perks: string };
+
+/** Progress to the CHOG holder level, and one tap to fill in the buy that gets there. */
+function UpgradeBar({ upgrade, busy, error, onFill }: { upgrade: Upgrade; busy: boolean; error: string | null; onFill: () => void }) {
+  const pct = Math.min(100, Math.max(0, (Number(upgrade.have) / Number(upgrade.min)) * 100));
+  return (
+    <section aria-label="Reach CHOG holder" className="mb-5 rounded-2xl bg-wash p-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="font-semibold">CHOG holder</h2>
+        <p className="text-sm font-semibold tabular-nums">
+          {formatChog(upgrade.have)} <span className="font-medium text-mute">of {formatChog(upgrade.min)} CHOG</span>
+        </p>
+      </div>
+      <div
+        role="progressbar"
+        aria-label="CHOG held toward CHOG holder"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(pct)}
+        className="mt-3 h-2 overflow-hidden rounded-full bg-white"
+      >
+        <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="mt-3 text-sm leading-relaxed text-mute">
+        {upgrade.perks} Buy {formatChog(upgrade.need)} more CHOG to get there.
+      </p>
+      <Button size="md" variant="ghost" className="mt-3 w-full" loading={busy} onClick={onFill}>
+        {busy ? "Working out the amount" : `Fill in the buy for ${formatChog(upgrade.need)} CHOG`}
+      </Button>
+      {error && <p className="mt-2 text-sm font-medium text-danger">{error}</p>}
+    </section>
+  );
 }

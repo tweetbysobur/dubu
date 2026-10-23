@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { formatChog, formatMon, type Me } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { formatUnits, parseUnits } from "viem";
+import { api, formatChog, formatMon, type Me, type TierFacts } from "@/lib/api";
 import { useMe } from "@/lib/useSession";
 import { memoryFor } from "@/lib/passkey";
 import { Container, Panel, buttonClass } from "@/components/ui";
 import { Mascot } from "@/components/Mascot";
-import { Swap } from "@/components/Swap";
+import { Swap, type Upgrade } from "@/components/Swap";
 import { TokenIcon } from "@/components/TokenIcon";
 
 export default function SwapPage() {
@@ -44,6 +46,8 @@ function SwapScreen({ me }: { me: Me }) {
   const [isPasskey, setIsPasskey] = useState(false);
   useEffect(() => setIsPasskey(!!memoryFor(me.address)), [me.address]);
   const chog = me.wallets[0]?.chogBalance ?? null;
+  const tiers = useQuery<TierFacts>({ queryKey: ["tiers"], queryFn: () => api<TierFacts>("/api/tiers") });
+  const upgrade = upgradeFor(me, tiers.data);
 
   return (
     <main>
@@ -75,7 +79,7 @@ function SwapScreen({ me }: { me: Me }) {
         </div>
 
         {me.swap ? (
-          <Swap address={me.address} monBalance={me.mon.balance} chogBalance={chog} isPasskey={isPasskey} />
+          <Swap address={me.address} monBalance={me.mon.balance} chogBalance={chog} isPasskey={isPasskey} upgrade={upgrade} />
         ) : (
           <Panel className="mt-6">
             <h2 className="font-display text-xl font-bold tracking-[-0.02em]">Swap opens soon</h2>
@@ -96,4 +100,21 @@ function SwapScreen({ me }: { me: Me }) {
       </Container>
     </main>
   );
+}
+
+/** A free account that tracks CHOG and has a minimum set: how far it is from CHOG holder. */
+function upgradeFor(me: Me, t: TierFacts | undefined): Upgrade | null {
+  if (me.tier !== "free" || !me.chog.tracked || !me.chog.min || !t) return null;
+  try {
+    const have = parseUnits(me.chog.balance, 18), min = parseUnits(me.chog.min, 18);
+    if (have >= min) return null;
+    // Round the shortfall up to 0.0001 CHOG so the buy always clears the line.
+    const step = 10n ** 14n;
+    const need = (((min - have) + step - 1n) / step) * step;
+    const facts = t.token;
+    const perks = `Hold ${formatChog(me.chog.min)} CHOG for ${facts.limit} videos a day, ${facts.quality}${facts.watermark ? "" : " and no watermark"}.`;
+    return { have: me.chog.balance, min: me.chog.min, need: formatUnits(need, 18), perks };
+  } catch {
+    return null;
+  }
 }
