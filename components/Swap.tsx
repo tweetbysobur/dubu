@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAccount, useSendTransaction, useSwitchChain } from "wagmi";
+import { useAccount, useSendTransaction, useSignTypedData, useSwitchChain } from "wagmi";
+import { keccak256, parseSignature } from "viem";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { api, ApiError, formatChog, formatMon } from "@/lib/api";
 import { activeChain } from "@/lib/chain";
-import { passkeyErrorMessage, signWithPasskey } from "@/lib/passkey";
+import { passkeyErrorMessage, signWithPasskey, withPasskeySession, type PasskeyTx } from "@/lib/passkey";
 import { notify } from "@/lib/notify";
 import { TokenIcon } from "./TokenIcon";
 import { Alert, Button, Panel, Spinner, buttonClass } from "./ui";
@@ -23,7 +24,16 @@ type Quote = {
   impact: number | null;
   venues: { nadfun: string | null; uniswap: string | null };
 };
-type Built = {
+type TypedPermit = {
+  domain: { name: string; version: string; chainId: number; verifyingContract: `0x${string}` };
+  types: { Permit: { name: string; type: string }[] };
+  primaryType: "Permit";
+  message: { owner: `0x${string}`; spender: `0x${string}`; value: string; nonce: string; deadline: string };
+};
+/** A sale that carries its own approval as a signature: one transaction instead of two. */
+type PermitStep = { step: "permit"; typedData: TypedPermit; router: `0x${string}`; minOutRaw: string; quote: Quote; networkFee: string };
+type Built = PermitStep | TxStep;
+type TxStep = {
   step: "approve" | "swap";
   tx: {
     to: `0x${string}`;
@@ -38,7 +48,7 @@ type Built = {
   quote: Quote;
   networkFee: string;
 };
-type Result = { hash: `0x${string}`; kind: "buy" | "sell" | "approve"; status: "success" | "reverted"; received: string | null };
+type Result = { hash: `0x${string}`; kind: "buy" | "sell" | "approve"; status: "success" | "reverted" | "pending"; received: string | null; paid?: string | null; fee?: string | null };
 
 const VENUE: Record<Quote["venue"], string> = { nadfun: "Nad.fun", uniswap: "Uniswap" };
 const SLIPPAGES = [50, 100, 300];
@@ -116,23 +126,54 @@ export function Swap({
   const { openConnectModal } = useConnectModal();
   const { switchChainAsync } = useSwitchChain();
   const { sendTransactionAsync } = useSendTransaction();
+  const { signTypedDataAsync } = useSignTypedData();
   const walletReady = isConnected && connected?.toLowerCase() === address.toLowerCase();
 
-  const build = () => api<Built>("/api/swap/build", { method: "POST", body: JSON.stringify({ side, amount, slippageBps: slippage }) });
+  const build = (extra: Record<string, unknown> = {}) =>
+    api<Built>("/api/swap/build", { method: "POST", body: JSON.stringify({ side, amount, slippageBps: slippage, ...extra }) });
 
-  const prepare = useMutation<Built, ApiError>({ mutationFn: build, onSuccess: (b) => setReview(b) });
+  const prepare = useMutation<Built, ApiError>({ mutationFn: () => build(), onSuccess: (b) => setReview(b) });
 
-  async function send(b: Built): Promise<Result> {
-    const tx = {
-      to: b.tx.to,
-      data: b.tx.data,
-      value: BigInt(b.tx.value),
-      gas: BigInt(b.tx.gas),
-      nonce: b.tx.nonce,
-      maxFeePerGas: BigInt(b.tx.maxFeePerGas),
-      maxPriorityFeePerGas: BigInt(b.tx.maxPriorityFeePerGas),
-      chainId: b.tx.chainId,
-    };
+  /** Set once a swap is signed: from then on Dubu follows it and never asks to sign it again. */
+  const [sent, setSent] = useState<`0x${string}` | null>(null);
+
+  /** Follows a sent swap by its hash until Monad confirms it. Never signs anything. */
+  async function follow(hash: `0x${string}`, first?: Result): Promise<Result> {
+    setSent(hash);
+    let r = first;
+    const until = Date.now() + 90_000;
+    while (!r || r.status === "pending") {
+      if (Date.now() > until) {
+        throw new Error("Your swap was sent. Monad has not confirmed it yet. Tap Check again in a moment. Do not swap again.");
+      }
+      if (r) await new Promise((ok) => setTimeout(ok, 1500));
+      r = await api<Result>("/api/swap/send", { method: "POST", body: JSON.stringify({ hash }) }).catch((e) => {
+        if (e instanceof ApiError && e.status === 400) throw e;
+        return undefined; // a slow reply: ask again
+      });
+    }
+    return r;
+  }
+
+  /** Sends a signed passkey swap once, then follows it. A failed reply is followed, not re-signed. */
+  async function submitRaw(raw: `0x${string}`): Promise<Result> {
+    const hash = keccak256(raw);
+    setSent(hash);
+    let first: Result | undefined;
+    try {
+      first = await api<Result>("/api/swap/send", { method: "POST", body: JSON.stringify({ raw }) });
+    } catch (e) {
+      // Monad refused it: nothing was sent, so signing again is safe.
+      if (e instanceof ApiError && e.status === 400) {
+        setSent(null);
+        throw e;
+      }
+    }
+    return follow(hash, first);
+  }
+
+  async function send(b: TxStep): Promise<Result> {
+    const tx = toTx(b);
     if (isPasskey) {
       let raw: `0x${string}`;
       try {
@@ -140,7 +181,7 @@ export function Swap({
       } catch (e) {
         throw new Error(e instanceof Error && e.message.startsWith("That passkey") ? e.message : passkeyErrorMessage(e));
       }
-      return api<Result>("/api/swap/send", { method: "POST", body: JSON.stringify({ raw }) });
+      return submitRaw(raw);
     }
     if (chainId !== activeChain.id) await switchChainAsync({ chainId: activeChain.id });
     let hash: `0x${string}`;
@@ -150,12 +191,65 @@ export function Swap({
     } catch {
       throw new Error("Cancelled in your wallet. Nothing was spent.");
     }
-    return api<Result>("/api/swap/send", { method: "POST", body: JSON.stringify({ hash }) });
+    return follow(hash);
+  }
+
+  /** Rebuilds the sale with the signed permit. Must come back as the sale itself. */
+  async function buildWithPermit(p: PermitStep, signature: `0x${string}`): Promise<TxStep> {
+    const sig = parseSignature(signature);
+    const v = sig.v !== undefined ? Number(sig.v) : sig.yParity + 27;
+    const permit = { v, r: sig.r, s: sig.s, deadline: p.typedData.message.deadline, minOut: p.minOutRaw, router: p.router };
+    const b = await build({ permit });
+    if (b.step !== "swap") throw new Error("Dubu could not prepare the sale. Review it again.");
+    return b;
+  }
+
+  /** One passkey prompt, or one signature and one transaction in a wallet, for the whole sale. */
+  async function sellWithPermit(p: PermitStep): Promise<Result> {
+    const typed = { ...p.typedData, message: { ...p.typedData.message, value: BigInt(p.typedData.message.value), nonce: BigInt(p.typedData.message.nonce), deadline: BigInt(p.typedData.message.deadline) } };
+    if (isPasskey) {
+      let raw: `0x${string}`;
+      try {
+        raw = await withPasskeySession(address, async (signer) => {
+          const signature = await signer.signTypedData(typed);
+          return signer.signTransaction(toTx(await buildWithPermit(p, signature)));
+        });
+      } catch (e) {
+        if (e instanceof ApiError) throw e;
+        throw new Error(e instanceof Error && /^(That passkey|Dubu could not)/.test(e.message) ? e.message : passkeyErrorMessage(e));
+      }
+      return submitRaw(raw);
+    }
+    if (chainId !== activeChain.id) await switchChainAsync({ chainId: activeChain.id });
+    let signature: `0x${string}`;
+    try {
+      signature = await signTypedDataAsync(typed);
+    } catch {
+      throw new Error("Cancelled in your wallet. Nothing was signed.");
+    }
+    return send(await buildWithPermit(p, signature));
   }
 
   const confirm = useMutation<void, Error>({
     mutationFn: async () => {
-      const r = await send(review!);
+      let r: Result;
+      if (sent) {
+        r = await follow(sent); // already signed: only check on it
+      } else if (review!.step === "permit") {
+        try {
+          r = await sellWithPermit(review!);
+        } catch (e) {
+          // The one-step sale was refused (an old token, a moved price). Fall back to allow, then sell.
+          if (e instanceof ApiError && e.status === 400) {
+            setReview(await build({ noPermit: true }));
+            throw new Error(`${e.message} You can also allow CHOG first, then sell.`);
+          }
+          throw e;
+        }
+      } else {
+        r = await send(review!);
+      }
+      setSent(null);
       if (r.kind === "approve") {
         if (r.status !== "success") throw new Error("The approval did not go through. Only the network fee was spent. Try again.");
         // Step 2: the sale itself, re-quoted now that CHOG is approved.
@@ -181,6 +275,7 @@ export function Swap({
   });
 
   function reset() {
+    setSent(null);
     setReview(null);
     setResult(null);
     setApproved(false);
@@ -220,7 +315,7 @@ export function Swap({
         />
       ) : review ? (
         <div>
-          {side === "sell" && (
+          {side === "sell" && review.step !== "permit" && (
             <ol className="mb-5 grid grid-cols-2 gap-2 text-sm font-semibold">
               <StepPill n={1} label="Allow CHOG" state={review.step === "approve" ? "now" : "done"} />
               <StepPill n={2} label="Sell" state={review.step === "swap" ? "now" : "next"} />
@@ -252,7 +347,7 @@ export function Swap({
             <Row label="Route">{VENUE[review.quote.venue]}</Row>
             <Row label="Network fee">Up to {formatMon(review.networkFee)} MON</Row>
           </dl>
-          {review.step === "swap" && (
+          {review.step !== "approve" && (
             <p className="mt-3 text-sm text-mute">
               If the price moves more than {review.quote.slippageBps / 100}% before it lands, the swap cancels itself.
             </p>
@@ -263,8 +358,10 @@ export function Swap({
               <Button size="lg" className="w-full sm:w-auto" disabled={confirm.isPending} onClick={() => confirm.mutate()}>
                 {confirm.isPending ? (
                   <>
-                    <Spinner /> {isPasskey ? "Confirm with your passkey" : "Confirm in your wallet"}
+                    <Spinner /> {sent ? "Confirming on Monad" : isPasskey ? "Confirm with your passkey" : "Confirm in your wallet"}
                   </>
+                ) : sent ? (
+                  "Check again"
                 ) : review.step === "approve" ? (
                   isPasskey ? "Allow with passkey" : "Allow in wallet"
                 ) : isPasskey ? (
@@ -278,7 +375,7 @@ export function Swap({
                 Connect {address.slice(0, 6)}…{address.slice(-4)}
               </Button>
             )}
-            <Button size="lg" variant="ghost" disabled={confirm.isPending} onClick={reset}>
+            <Button size="lg" variant="ghost" disabled={confirm.isPending || !!sent} onClick={reset}>
               Back
             </Button>
           </div>
@@ -398,7 +495,7 @@ export function Swap({
               {side === "sell" && (
                 <>
                   <dt className="text-mute">Steps</dt>
-                  <dd className="text-right font-medium">Allow CHOG, then sell</dd>
+                  <dd className="text-right font-medium">{q.venue === "nadfun" ? "One confirmation" : "Allow CHOG, then sell"}</dd>
                 </>
               )}
             </dl>
@@ -503,9 +600,10 @@ function SwapDone({ result, quote, onAgain }: { result: Result; quote: Quote; on
       <dl className="mt-6 divide-y divide-line rounded-2xl border border-line">
         <Row label={ok ? "You paid" : "You tried to pay"}>
           <span className="flex items-center gap-2">
-            <TokenIcon token={pay} size={20} /> {fmt(pay, quote.amountIn)} {SYMBOL[pay]}
+            <TokenIcon token={pay} size={20} /> {fmt(pay, result.paid ?? quote.amountIn)} {SYMBOL[pay]}
           </span>
         </Row>
+        {result.fee && <Row label="Network fee">{formatMon(result.fee)} MON</Row>}
         <Row label="Route">{VENUE[quote.venue]}</Row>
         <Row label="Network">{activeChain.name}</Row>
         <Row label="Transaction">
@@ -538,4 +636,17 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
       <dd className="text-right font-semibold tabular-nums">{children}</dd>
     </div>
   );
+}
+
+function toTx(b: TxStep): PasskeyTx {
+  return {
+    to: b.tx.to,
+    data: b.tx.data,
+    value: BigInt(b.tx.value),
+    gas: BigInt(b.tx.gas),
+    nonce: b.tx.nonce,
+    maxFeePerGas: BigInt(b.tx.maxFeePerGas),
+    maxPriorityFeePerGas: BigInt(b.tx.maxPriorityFeePerGas),
+    chainId: b.tx.chainId,
+  };
 }

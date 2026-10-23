@@ -90,8 +90,8 @@ function SwapScreen({ me }: { me: Me }) {
         )}
 
         <p className="mt-4 text-sm leading-relaxed text-mute">
-          Swaps use your Dubu wallet on Monad. CHOG in linked wallets stays there. Selling takes two confirmations: one to
-          allow exactly that much CHOG, one for the sale.
+          Swaps use your Dubu wallet on Monad. CHOG in linked wallets stays there. Each swap takes one confirmation. A sale on
+          Uniswap asks twice: once to allow exactly that much CHOG, once for the sale.
         </p>
       </Container>
     </main>

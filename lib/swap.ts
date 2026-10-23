@@ -7,9 +7,11 @@ import {
   parseAbi,
   parseEventLogs,
   parseTransaction,
+  keccak256,
   recoverTransactionAddress,
   type Address,
   type Hex,
+  domainSeparator,
 } from "viem";
 import { activeChain } from "./chain";
 import { client } from "./chog";
@@ -154,6 +156,8 @@ const NAD_ROUTER_ABI = parseAbi([
   "function buy(BuyParams params) payable",
   "struct SellParams { uint256 amountIn; uint256 amountOutMin; address token; address to; uint256 deadline; }",
   "function sell(SellParams params)",
+  "struct SellPermitParams { uint256 amountIn; uint256 amountOutMin; uint256 amountAllowance; address token; address to; uint256 deadline; uint8 v; bytes32 r; bytes32 s; }",
+  "function sellPermit(SellPermitParams params)",
 ]);
 const QUOTER_ABI = parseAbi([
   "struct QuoteParams { address tokenIn; address tokenOut; uint256 amountIn; uint24 fee; uint160 sqrtPriceLimitX96; }",
@@ -172,6 +176,9 @@ const ERC20_ABI = parseAbi([
   "function approve(address spender, uint256 amount) returns (bool)",
   "function allowance(address owner, address spender) view returns (uint256)",
   "function balanceOf(address owner) view returns (uint256)",
+  "function nonces(address owner) view returns (uint256)",
+  "function name() view returns (string)",
+  "function DOMAIN_SEPARATOR() view returns (bytes32)",
 ]);
 const WMON_EVENTS = parseAbi(["event Withdrawal(address indexed src, uint256 wad)"]);
 const FEE_TIERS = [500, 3000, 10000] as const;
@@ -318,8 +325,21 @@ export type UnsignedSwap = {
   chainId: number;
 };
 
-/** What to sign next: the CHOG approval a sale needs first, or the swap itself. */
-export type BuildStep = "approve" | "swap";
+/**
+ * What to sign next:
+ *  - "permit": a gasless ERC-2612 signature that lets the Nad.fun router take exactly the
+ *    amount being sold, so the sale is one transaction (and one passkey prompt).
+ *  - "approve": the CHOG approval transaction, for routes or tokens without permits.
+ *  - "swap": the swap itself.
+ */
+export type BuildStep = "permit" | "approve" | "swap";
+
+/** A permit the user signed, sent back to build the one-transaction sale. */
+export type SignedPermit = { v: number; r: Hex; s: Hex; deadline: bigint; router: Address; minOut: bigint };
+
+const PERMIT_TTL_S = 10 * 60;
+/** Gas a Nad.fun sale with a permit usually takes; only for the fee shown before signing. */
+const SELL_GAS_GUESS = 250_000n;
 
 function encodeSwap(side: Side, best: Route, from: Address, amountIn: bigint, floor: bigint) {
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 10 * 60);
@@ -353,10 +373,18 @@ function encodeSwap(side: Side, best: Route, from: Address, amountIn: bigint, fl
  * Re-quotes, then builds the next call with `from` as the only recipient and checks it would go through.
  * A sale without enough CHOG allowance returns the approval first: exactly `amountIn`, to the quoted router.
  */
-export async function buildSwap(from: Address, side: Side, amountIn: bigint, slippageBps: number) {
+export async function buildSwap(from: Address, side: Side, amountIn: bigint, slippageBps: number, permit?: SignedPermit, noPermit = false) {
   const [r, d] = await Promise.all([routeOrThrow(side, amountIn), decimals()]);
   const best = r.best;
   const floor = minOut(best.amountOut, slippageBps);
+  if (permit) {
+    if (side !== "sell" || best.venue !== "nadfun") throw new SwapError("That signature is only for a Nad.fun sale. Review the sale again.");
+    if (best.router.toLowerCase() !== permit.router.toLowerCase()) throw new SwapError("The route changed since you reviewed. Review the sale again.");
+    // Never fill a sale for less than the person reviewed.
+    if (floor < permit.minOut) throw new SwapError("The price moved since you reviewed. Review the sale again.");
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    if (permit.deadline < now + 30n || permit.deadline > now + BigInt(PERMIT_TTL_S) + 60n) throw new SwapError("That signature expired. Review the sale again.");
+  }
 
   const [monBal, chogBal, allowance, fees, nonce] = await Promise.all([
     client.getBalance({ address: from }),
@@ -370,12 +398,32 @@ export async function buildSwap(from: Address, side: Side, amountIn: bigint, sli
   if (side === "buy" && monBal < amountIn) throw new SwapError("This wallet does not have that much MON.");
   if (side === "sell" && chogBal < amountIn) throw new SwapError("This wallet does not have that much CHOG.");
 
-  const step: BuildStep = side === "sell" && allowance < amountIn ? "approve" : "swap";
+  const needsAllowance = side === "sell" && allowance < amountIn;
+
+  // A Nad.fun sale can carry its own approval as a signature: one transaction, one prompt.
+  if (needsAllowance && !permit && !noPermit && best.venue === "nadfun") {
+    const typed = await permitRequest(from, best.router, amountIn).catch(() => null);
+    if (typed) {
+      const q = toQuote(side, r, amountIn, slippageBps, d);
+      // A rough fee for the review: a Nad.fun sale, plus the same 15% buffer the real build adds.
+      const fee = (SELL_GAS_GUESS * 115n * fees.maxFeePerGas) / 100n;
+      if (monBal < fee) throw new SwapError("Not enough MON for the network fee. Deposit a little MON first.");
+      return { step: "permit" as const, typedData: typed, router: best.router, minOutRaw: floor.toString(), quote: q, networkFee: formatEther(fee) };
+    }
+  }
+
+  const step: BuildStep = needsAllowance && !permit ? "approve" : "swap";
   const to = step === "approve" ? cfg.chog! : best.router;
   const data =
     step === "approve"
       ? encodeFunctionData({ abi: ERC20_ABI, functionName: "approve", args: [best.router, amountIn] })
-      : encodeSwap(side, best, from, amountIn, floor);
+      : permit
+        ? encodeFunctionData({
+            abi: NAD_ROUTER_ABI,
+            functionName: "sellPermit",
+            args: [{ amountIn, amountOutMin: floor, amountAllowance: amountIn, token: cfg.chog!, to: from, deadline: permit.deadline, v: permit.v, r: permit.r, s: permit.s }],
+          })
+        : encodeSwap(side, best, from, amountIn, floor);
   const value = side === "buy" ? amountIn : 0n;
   checkCall(to, data, from, value); // the same check every signed call gets
 
@@ -411,6 +459,37 @@ export async function buildSwap(from: Address, side: Side, amountIn: bigint, sli
   return { step, tx, quote: toQuote(side, r, amountIn, slippageBps, d), networkFee: formatEther(gas * fees.maxFeePerGas) };
 }
 
+/**
+ * The EIP-2612 permit to sign: exactly amountIn, to the router the quote picked, for ten
+ * minutes. Returns null when the token has no permit support (the caller falls back to
+ * an approval transaction). Values are strings so the result survives JSON.
+ */
+async function permitRequest(owner: Address, spender: Address, value: bigint) {
+  const [nonce, name, separator] = await Promise.all([
+    client.readContract({ address: cfg.chog!, abi: ERC20_ABI, functionName: "nonces", args: [owner] }),
+    client.readContract({ address: cfg.chog!, abi: ERC20_ABI, functionName: "name" }),
+    client.readContract({ address: cfg.chog!, abi: ERC20_ABI, functionName: "DOMAIN_SEPARATOR" }),
+  ]);
+  const domain = { name, version: "1", chainId: activeChain.id, verifyingContract: cfg.chog! };
+  // Only ask for a signature the token will accept. Anything else falls back to an approval.
+  if (domainSeparator({ domain }).toLowerCase() !== separator.toLowerCase()) throw new Error("permit domain mismatch");
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + PERMIT_TTL_S);
+  return {
+    domain,
+    types: {
+      Permit: [
+        { name: "owner", type: "address" },
+        { name: "spender", type: "address" },
+        { name: "value", type: "uint256" },
+        { name: "nonce", type: "uint256" },
+        { name: "deadline", type: "uint256" },
+      ],
+    },
+    primaryType: "Permit" as const,
+    message: { owner, spender, value: value.toString(), nonce: nonce.toString(), deadline: deadline.toString() },
+  };
+}
+
 export type CallKind = "buy" | "sell" | "approve";
 
 /**
@@ -443,6 +522,18 @@ export function checkCall(to: string | null | undefined, data: Hex | undefined, 
       if (call.functionName === "buy") {
         const p = call.args[0];
         if (p.token.toLowerCase() === chog && p.to.toLowerCase() === me && p.amountOutMin > 0n && value > 0n) return "buy";
+      } else if (call.functionName === "sellPermit") {
+        const p = call.args[0];
+        if (
+          p.token.toLowerCase() === chog &&
+          p.to.toLowerCase() === me &&
+          p.amountOutMin > 0n &&
+          p.amountIn > 0n &&
+          p.amountAllowance === p.amountIn &&
+          value === 0n
+        ) {
+          return "sell";
+        }
       } else if (call.functionName === "sell") {
         const p = call.args[0];
         if (p.token.toLowerCase() === chog && p.to.toLowerCase() === me && p.amountOutMin > 0n && p.amountIn > 0n && value === 0n) {
@@ -491,9 +582,14 @@ export function checkCall(to: string | null | undefined, data: Hex | undefined, 
 export type SwapResult = {
   hash: Hex;
   kind: CallKind;
-  status: "success" | "reverted";
+  /** "pending": sent, not confirmed yet. Ask again with the hash; never sign again. */
+  status: "success" | "reverted" | "pending";
   /** CHOG for a buy, MON for a sell, null for an approval or when it cannot be read. */
   received: string | null;
+  /** What left the wallet for the swap, read from the chain: MON for a buy, CHOG for a sell. */
+  paid?: string | null;
+  /** Network fee in MON, read from the receipt. */
+  fee?: string | null;
 };
 
 /** MON a sale paid out: WMON unwrapped in the same transaction, which both venues do. */
@@ -504,24 +600,28 @@ function monFromLogs(logs: Parameters<typeof parseEventLogs>[0]["logs"]) {
     .reduce((s, l) => s + l.args.wad, 0n);
 }
 
-async function settle(hash: Hex, from: string, kind: CallKind): Promise<SwapResult> {
+async function settle(hash: Hex, from: string, kind: CallKind, value: bigint): Promise<SwapResult> {
   let receipt;
   try {
-    receipt = await client.waitForTransactionReceipt({ hash, timeout: 25_000 });
+    receipt = await client.waitForTransactionReceipt({ hash, timeout: 20_000, pollingInterval: 500 });
   } catch {
-    throw new SwapError("The swap was sent but is not confirmed yet. Check MonadScan in a minute.");
+    return { hash, kind, status: "pending", received: null };
   }
-  if (receipt.status !== "success") return { hash, kind, status: "reverted", received: null };
-  if (kind === "approve") return { hash, kind, status: "success", received: null };
+  const fee = receipt.effectiveGasPrice ? formatEther(receipt.gasUsed * receipt.effectiveGasPrice) : null;
+  if (receipt.status !== "success") return { hash, kind, status: "reverted", received: null, paid: null, fee };
+  if (kind === "approve") return { hash, kind, status: "success", received: null, paid: null, fee };
+  const d = await decimals();
+  const chogMoves = parseEventLogs({ abi: ERC20_ABI, logs: receipt.logs, eventName: "Transfer" }).filter(
+    (l) => l.address.toLowerCase() === cfg.chog!.toLowerCase(),
+  );
+  const me = from.toLowerCase();
   if (kind === "sell") {
     const mon = monFromLogs(receipt.logs);
-    return { hash, kind, status: "success", received: mon > 0n ? formatEther(mon) : null };
+    const sold = chogMoves.filter((l) => l.args.from.toLowerCase() === me).reduce((s, l) => s + l.args.value, 0n);
+    return { hash, kind, status: "success", received: mon > 0n ? formatEther(mon) : null, paid: sold > 0n ? formatUnits(sold, d) : null, fee };
   }
-  const d = await decimals();
-  const got = parseEventLogs({ abi: ERC20_ABI, logs: receipt.logs, eventName: "Transfer" })
-    .filter((l) => l.address.toLowerCase() === cfg.chog!.toLowerCase() && l.args.to.toLowerCase() === from.toLowerCase())
-    .reduce((s, l) => s + l.args.value, 0n);
-  return { hash, kind, status: "success", received: formatUnits(got, d) };
+  const got = chogMoves.filter((l) => l.args.to.toLowerCase() === me).reduce((s, l) => s + l.args.value, 0n);
+  return { hash, kind, status: "success", received: formatUnits(got, d), paid: formatEther(value), fee };
 }
 
 /** Passkey path: the browser signs, Dubu checks the signed swap, then broadcasts it. */
@@ -538,26 +638,26 @@ export async function sendSignedSwap(raw: Hex, from: Address): Promise<SwapResul
   if (tx.chainId !== activeChain.id) throw new SwapError("That swap is for a different network.");
   const kind = checkCall(tx.to, tx.data, from, tx.value ?? 0n);
 
-  let hash: Hex;
+  // A signed transaction's hash is fixed, so the same swap sent twice is still one swap.
+  const hash = keccak256(raw);
   try {
-    hash = await client.sendRawTransaction({ serializedTransaction: raw });
+    await client.sendRawTransaction({ serializedTransaction: raw });
   } catch (e) {
-    console.error("[swap] broadcast failed", e);
-    throw new SwapError("Monad did not accept the swap. Nothing was spent. Try again.");
+    // Already on the network (a retry after a slow reply): follow it instead of failing.
+    const known = await client.getTransaction({ hash }).catch(() => null);
+    if (!known) {
+      console.error("[swap] broadcast failed", e);
+      throw new SwapError("Monad did not accept the swap. Nothing was spent. Try again.");
+    }
   }
-  return settle(hash, from, kind);
+  return settle(hash, from, kind, tx.value ?? 0n);
 }
 
 /** External wallet path: the wallet broadcast it. Dubu only confirms it and reads what arrived. */
 export async function trackSwap(hash: Hex, from: Address): Promise<SwapResult> {
-  // Wait for it to land first, so the transaction can always be read back.
-  try {
-    await client.waitForTransactionReceipt({ hash, timeout: 25_000 });
-  } catch {
-    throw new SwapError("The swap was sent but is not confirmed yet. Check MonadScan in a minute.");
-  }
-  const tx = await client.getTransaction({ hash });
+  const tx = await client.getTransaction({ hash }).catch(() => null);
+  if (!tx) return { hash, kind: "buy", status: "pending", received: null }; // not seen yet: ask again
   if (tx.from.toLowerCase() !== from.toLowerCase()) throw new SwapError("That transaction is from a different wallet.");
   const kind = checkCall(tx.to, tx.input, from, tx.value);
-  return settle(hash, from, kind);
+  return settle(hash, from, kind, tx.value); // waits for the receipt, or says "pending"
 }

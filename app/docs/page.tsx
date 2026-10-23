@@ -326,8 +326,10 @@ export default function DocsPage() {
                     minimum you will get before you confirm, and Max on a buy keeps a little MON back for network fees.
                   </p>
                   <p>
-                    Selling takes two confirmations. First you allow exactly that much CHOG to be used, then you confirm the
-                    sale. Both cost a small network fee in MON.
+                    Every swap takes one confirmation. On Nad.fun, a sale carries a signature that lets the router use
+                    exactly the CHOG you sell, so there is one passkey prompt and one network fee. On Uniswap, a sale asks
+                    twice: first you allow exactly that much CHOG, then you confirm the sale. Once you confirm, Dubu
+                    follows that transaction until Monad confirms it and never asks you to sign it again.
                   </p>
                 </>
               ) : (

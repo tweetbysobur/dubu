@@ -235,3 +235,29 @@ export async function signWithPasskey(expected: string, tx: PasskeyTx): Promise<
     end();
   }
 }
+
+/** What a passkey session can sign: one typed-data permit and one transaction. */
+export type PasskeySigner = {
+  signTypedData: (typed: Parameters<Awaited<ReturnType<typeof openPasskeyWallet>>["account"]["signTypedData"]>[0]) => Promise<`0x${string}`>;
+  signTransaction: (tx: PasskeyTx) => Promise<`0x${string}`>;
+};
+
+/**
+ * Opens the passkey wallet once (one Face ID or fingerprint), runs `fn` with it, then
+ * wipes the key. Used when a swap needs a permit and the sale itself: one prompt, not two.
+ * Refuses if the passkey opens a different wallet than `expected`.
+ */
+export async function withPasskeySession<T>(expected: string, fn: (signer: PasskeySigner) => Promise<T>): Promise<T> {
+  const { account, end } = await openPasskeyWallet(false, memoryFor(expected)?.credentialId);
+  try {
+    if (account.address.toLowerCase() !== expected.toLowerCase()) {
+      throw new Error("That passkey opens a different wallet. Use the passkey for this account. Nothing was signed.");
+    }
+    return await fn({
+      signTypedData: (typed) => account.signTypedData(typed),
+      signTransaction: (tx) => account.signTransaction({ ...tx, type: "eip1559" }),
+    });
+  } finally {
+    end();
+  }
+}
