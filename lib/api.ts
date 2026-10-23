@@ -38,7 +38,10 @@ export function formatChog(amount: string | null | undefined): string {
 /** MON amount for display, up to 4 decimals. */
 export function formatMon(amount: string | null | undefined): string {
   const n = Number(amount ?? 0);
-  return Number.isFinite(n) ? new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(n) : "0";
+  if (!Number.isFinite(n)) return "0";
+  // Never round a real balance down to zero.
+  if (n > 0 && n < 0.0001) return "<0.0001";
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(n);
 }
 
 export type Me = {

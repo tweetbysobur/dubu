@@ -66,7 +66,11 @@ export function useSignOut() {
       await api("/api/auth/logout", { method: "POST" }).catch(() => {});
       if (isConnected) disconnect();
     },
-    onSettled: () => qc.setQueryData(["me"], null),
+    onSettled: () => {
+      // Drop everything cached for the old account (balances, quotes, Chogs), not just "me".
+      qc.clear();
+      qc.setQueryData(["me"], null);
+    },
   });
 }
 
@@ -87,7 +91,11 @@ export function useSession() {
   const me = useMe();
   const signOut = useSignOut();
 
-  const done = () => qc.invalidateQueries({ queryKey: ["me"] });
+  // A new session may be a different account: never show the previous account's numbers while loading.
+  const done = () => {
+    qc.removeQueries({ predicate: (q) => q.queryKey[0] !== "showcase" && q.queryKey[0] !== "tiers" });
+    return qc.invalidateQueries({ queryKey: ["me"] });
+  };
 
   const passkey = useMutation({
     mutationFn: async (arg: "create" | "open" | "open-any" | { credentialId: string }) => {
