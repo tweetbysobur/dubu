@@ -1,12 +1,21 @@
 "use client";
 
-/** Re-encodes a video in the browser with a burned-in watermark. Returns a WebM blob. */
-export async function burnWatermark(src: Blob, text = "Made with Dubu"): Promise<Blob> {
-  if (typeof MediaRecorder === "undefined") throw new Error("Your browser cannot export video. Try Chrome or Firefox.");
-  const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((m) =>
-    MediaRecorder.isTypeSupported(m),
-  );
-  if (!mime) throw new Error("Your browser cannot export WebM video. Try Chrome or Firefox.");
+/**
+ * Re-encodes a video in the browser with a burned-in watermark. Records WebM where the
+ * browser can, and MP4 where it cannot (iPhone and iPad Safari only record MP4).
+ */
+export async function burnWatermark(src: Blob, text = "Made with Dubu"): Promise<{ blob: Blob; ext: "webm" | "mp4" }> {
+  if (typeof MediaRecorder === "undefined") throw new Error("This browser cannot add the watermark. Try Safari or Chrome.");
+  const mime = [
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+    "video/mp4;codecs=avc1.42E01E",
+    "video/mp4;codecs=avc1",
+    "video/mp4",
+  ].find((m) => MediaRecorder.isTypeSupported(m));
+  if (!mime) throw new Error("This browser cannot add the watermark. Try Safari or Chrome.");
+  const type = mime.startsWith("video/mp4") ? "video/mp4" : "video/webm";
 
   const url = URL.createObjectURL(src);
   const video = document.createElement("video");
@@ -27,7 +36,7 @@ export async function burnWatermark(src: Blob, text = "Made with Dubu"): Promise
   const recorder = new MediaRecorder(canvas.captureStream(30), { mimeType: mime, videoBitsPerSecond: 4_000_000 });
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-  const done = new Promise<Blob>((ok) => (recorder.onstop = () => ok(new Blob(chunks, { type: "video/webm" }))));
+  const done = new Promise<Blob>((ok) => (recorder.onstop = () => ok(new Blob(chunks, { type }))));
 
   const draw = () => {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -44,11 +53,40 @@ export async function burnWatermark(src: Blob, text = "Made with Dubu"): Promise
   recorder.start(250);
   await video.play();
   draw();
-  await new Promise<void>((ok) => (video.onended = () => ok()));
+  // Some phones never fire "ended" for an off-screen video: stop at its length plus a margin.
+  const limitMs = (Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 10) * 1000 + 3000;
+  await new Promise<void>((ok) => {
+    video.onended = () => ok();
+    setTimeout(ok, limitMs);
+  });
   recorder.stop();
   const out = await done;
   URL.revokeObjectURL(url);
-  return out;
+  return { blob: out, ext: type === "video/mp4" ? "mp4" : "webm" };
+}
+
+/**
+ * Phones save media through the share sheet ("Save Video", "Save Image"). It must open
+ * inside a tap, so on phones the file is prepared first and saved on a second tap.
+ */
+export function needsShareSheet(file: File): boolean {
+  if (typeof navigator === "undefined" || typeof navigator.canShare !== "function") return false;
+  const touch = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+  try {
+    return touch && navigator.canShare({ files: [file] });
+  } catch {
+    return false;
+  }
+}
+
+/** Call from a tap. Opens the share sheet, or falls back to a plain download. */
+export async function shareOrSave(file: File) {
+  try {
+    await navigator.share({ files: [file] });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") return; // the person closed the sheet
+    saveBlob(file, file.name);
+  }
 }
 
 export function saveBlob(blob: Blob, filename: string) {

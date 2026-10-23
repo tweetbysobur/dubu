@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, ApiError, type JobStatus } from "@/lib/api";
-import { burnWatermark, saveBlob } from "@/lib/watermark";
+import { burnWatermark, needsShareSheet, saveBlob, shareOrSave } from "@/lib/watermark";
 import { Alert, Button, Container, buttonClass } from "@/components/ui";
 import { Mascot, type Mood } from "@/components/Mascot";
 import { LevelBadge } from "@/components/LevelBadge";
@@ -34,14 +34,23 @@ export default function ResultPage() {
     return () => clearInterval(t);
   }, [processing]);
 
+  // On phones a prepared file waits here for a second tap that opens the share sheet.
+  const [readyVideo, setReadyVideo] = useState<File | null>(null);
+  const [readyGif, setReadyGif] = useState<File | null>(null);
+  const deliver = (file: File, keep: (f: File) => void) => (needsShareSheet(file) ? keep(file) : saveBlob(file, file.name));
+
   const download = useMutation({
     mutationFn: async () => {
       const data = job.data!;
       const res = await fetch(data.videoUrl!, { credentials: "same-origin" });
       if (!res.ok) throw new Error("Dubu could not download the video. Try again.");
       const blob = await res.blob();
-      if (data.watermark) saveBlob(await burnWatermark(blob), `dubu-${fileStamp()}.webm`);
-      else saveBlob(blob, `dubu-${fileStamp()}.mp4`);
+      if (data.watermark) {
+        const out = await burnWatermark(blob);
+        deliver(new File([out.blob], `dubu-${fileStamp()}.${out.ext}`, { type: out.blob.type }), setReadyVideo);
+      } else {
+        deliver(new File([blob], `dubu-${fileStamp()}.mp4`, { type: "video/mp4" }), setReadyVideo);
+      }
     },
   });
 
@@ -51,7 +60,8 @@ export default function ResultPage() {
       const res = await fetch(data.videoUrl!, { credentials: "same-origin" });
       if (!res.ok) throw new Error("Dubu could not download the video. Try again.");
       const { videoToGif } = await import("@/lib/gif");
-      saveBlob(await videoToGif(await res.blob(), { watermark: data.watermark ? "Made with Dubu" : undefined }), `dubu-${fileStamp()}.gif`);
+      const out = await videoToGif(await res.blob(), { watermark: data.watermark ? "Made with Dubu" : undefined });
+      deliver(new File([out], `dubu-${fileStamp()}.gif`, { type: "image/gif" }), setReadyGif);
     },
   });
 
@@ -161,12 +171,24 @@ export default function ResultPage() {
                 </p>
               </div>
               <div className="flex flex-col gap-3 sm:w-56">
-                <Button size="lg" loading={download.isPending} onClick={() => download.mutate()}>
-                  {download.isPending ? (job.data.watermark ? "Adding watermark" : "Preparing download") : "Download video"}
-                </Button>
-                <Button size="lg" variant="ghost" loading={gif.isPending} onClick={() => gif.mutate()}>
-                  {gif.isPending ? "Making the GIF" : "Download GIF"}
-                </Button>
+                {readyVideo ? (
+                  <Button size="lg" onClick={() => shareOrSave(readyVideo)}>
+                    Save video
+                  </Button>
+                ) : (
+                  <Button size="lg" loading={download.isPending} onClick={() => download.mutate()}>
+                    {download.isPending ? (job.data.watermark ? "Adding watermark" : "Preparing download") : "Download video"}
+                  </Button>
+                )}
+                {readyGif ? (
+                  <Button size="lg" variant="ghost" onClick={() => shareOrSave(readyGif)}>
+                    Save GIF
+                  </Button>
+                ) : (
+                  <Button size="lg" variant="ghost" loading={gif.isPending} onClick={() => gif.mutate()}>
+                    {gif.isPending ? "Making the GIF" : "Download GIF"}
+                  </Button>
+                )}
                 <Link href="/studio" className={buttonClass("ghost", "lg")}>
                   Make another video
                 </Link>
