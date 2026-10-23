@@ -1,18 +1,19 @@
 "use client";
 
 /**
- * Re-encodes a video in the browser with a burned-in watermark. Records WebM where the
- * browser can, and MP4 where it cannot (iPhone and iPad Safari only record MP4).
+ * Re-encodes a video in the browser with a burned-in watermark. Records MP4 whenever the
+ * browser can, because MP4 plays everywhere (an iPhone can record WebM but cannot play
+ * it). WebM is only the fallback for browsers that cannot record MP4.
  */
 export async function burnWatermark(src: Blob, text = "Made with Dubu"): Promise<{ blob: Blob; ext: "webm" | "mp4" }> {
   if (typeof MediaRecorder === "undefined") throw new Error("This browser cannot add the watermark. Try Safari or Chrome.");
   const mime = [
-    "video/webm;codecs=vp9",
-    "video/webm;codecs=vp8",
-    "video/webm",
     "video/mp4;codecs=avc1.42E01E",
     "video/mp4;codecs=avc1",
     "video/mp4",
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
   ].find((m) => MediaRecorder.isTypeSupported(m));
   if (!mime) throw new Error("This browser cannot add the watermark. Try Safari or Chrome.");
   const type = mime.startsWith("video/mp4") ? "video/mp4" : "video/webm";
