@@ -1,3 +1,4 @@
+import { checkCaption } from "@/lib/contentRules";
 import { NextResponse } from "next/server";
 import { getSessionAddress } from "@/lib/session";
 import { getOwnedTokenAny, uriCandidates, type ChogToken } from "@/lib/chog";
@@ -53,6 +54,10 @@ export async function POST(req: Request) {
 
   const prompt = cleanPrompt(body.prompt);
   if (!prompt) return fail(400, "Prompt must be 3 to 500 characters.");
+
+  // Content rules come before anything else, so a refused caption never uses a video.
+  const rules = checkCaption(prompt);
+  if (!rules.ok) return fail(400, rules.message);
 
   // Ownership is re-checked on every generation. The client never decides the tier.
   let status;

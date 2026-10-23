@@ -183,6 +183,12 @@ export function Studio({ me }: { me: Me }) {
             >
               {generate.isPending ? (directorOn && directing ? "Directing the shot" : "Starting your video") : (blocker ?? "Make my video")}
             </Button>
+            <p className="mt-3 text-center text-sm text-mute">
+              Keep it friendly: no nudity, sexual content, gore or hate.{" "}
+              <Link href="/docs#rules" className="font-medium text-brand underline-offset-4 hover:underline">
+                Content rules
+              </Link>
+            </p>
             {generate.isError && (
               <div className="mt-4">
                 <Alert>{generate.error.message}</Alert>

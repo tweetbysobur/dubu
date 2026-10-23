@@ -17,6 +17,10 @@ function items(t?: TierFacts): { q: string; a: string }[] {
       a: `No. Anyone gets ${free} free videos a day. ${unlock} unlocks more.`,
     },
     {
+      q: "What can't I make with Dubu?",
+      a: "Dubu is for fun, creative videos. No nudity or sexual content, nothing that harms children, no gore or self-harm, no hate, and no real people without their permission. Captions that ask for these are turned down and do not use a video. The full content rules are in the Docs.",
+    },
+    {
       q: "What is a passkey wallet?",
       a: "A wallet made with Face ID or your fingerprint. Nothing to install, and Dubu never sees its key.",
     },
