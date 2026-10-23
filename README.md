@@ -14,6 +14,7 @@
 - **Passkey wallets.** Sign in with Face ID or a fingerprint. No app, no seed phrase, no gas. Or connect any EVM wallet that supports Monad.
 - **Linked wallets.** Keep your Chog in a cold wallet and link it. Dubu counts everything your linked wallets hold.
 - **Swap.** Buy and sell CHOG with MON. Dubu quotes Nad.fun and Uniswap and uses the better price.
+- **Withdraw.** Send MON or CHOG from your Dubu wallet to any Monad address, with one confirmation.
 - **Deposit and notifications.** A deposit page with a QR code, and alerts for deposits, swaps and finished videos.
 
 ## Levels
@@ -64,6 +65,7 @@ Every value lives in the environment. `.env.example` lists them all with notes.
 | Director | `DIRECTOR_API_KEY`, `DIRECTOR_MODEL` |
 | Storage | `KV_REST_API_URL`, `KV_REST_API_TOKEN` (set by the Upstash integration on Vercel) |
 | Limits | `HOLDER_DAILY_LIMIT`, `TOKEN_DAILY_LIMIT`, `FREE_DAILY_LIMIT`, `FREE_IP_DAILY_LIMIT` |
+| Withdraw | `WITHDRAW_ENABLED` (on unless set to `false`) |
 | Swap | `SWAP_ENABLED`, `SWAP_CANARY_ADDRESSES`, `SWAP_MIN_MON`, `SWAP_MAX_MON`, `SWAP_MIN_CHOG`, `SWAP_MAX_CHOG`, `WMON_ADDRESS`, `NADFUN_LENS`, `NADFUN_BONDING_ROUTER`, `NADFUN_DEX_ROUTER`, `UNISWAP_V3_ROUTER`, `UNISWAP_V3_QUOTER` |
 | Landing | `SHOWCASE_CHOG_IDS`, `CHOG_TOKEN_LOGO_URL` |
 
@@ -74,6 +76,7 @@ Every value lives in the environment. `.env.example` lists them all with notes.
 - **Levels.** Ownership and balances are read onchain on every video. A saved Chog is re-checked with `ownerOf` on every read, so a sold Chog drops off.
 - **Linked wallets.** Each link is proved by a signature from that wallet, and a wallet can belong to one account at a time.
 - **Swaps.** The server builds every call with the user as the only recipient. Before anything is broadcast, it decodes the call again and refuses anything else: only the configured routers, CHOG in or out, a real minimum, and no MON attached to approvals or sales. A sale approves exactly the amount being sold.
+- **Withdrawals.** A signed withdrawal is broadcast only if it is a plain MON send or a CHOG `transfer` from the signed-in wallet. The zero address, the wallet itself and every configured token or router contract are refused as recipients. The same signed transaction sent twice is one transaction.
 - **Limits.** Daily quotas per account, a daily cap on free videos per network, burst limits on generation, and rate limits on sign-in, quotes, swaps, images and account reads. Generation fails closed if Redis is down; sign-in fails open.
 - **Headers.** The site cannot be framed by another site, and content types are enforced.
 

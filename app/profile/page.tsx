@@ -13,6 +13,7 @@ import { Mascot } from "@/components/Mascot";
 import { ExportWallet } from "@/components/ExportWallet";
 import { TokenIdLoader } from "@/components/TokenIdLoader";
 import { TokenIcon } from "@/components/TokenIcon";
+import { WalletGlyph } from "@/components/WalletGlyphs";
 import { ChogFrame } from "@/components/ChogFrame";
 import { LevelBadge, LevelMark } from "@/components/LevelBadge";
 import { notify } from "@/lib/notify";
@@ -147,7 +148,7 @@ function Icon({ d }: { d: string }) {
   );
 }
 
-/** The wallet at a glance: address, balances with their marks, and the actions that move money in. */
+/** The wallet at a glance: address, balances with their marks, and the actions that move money in and out. */
 function WalletCard({ me, isPasskey }: { me: Me; isPasskey: boolean }) {
   const [copied, setCopied] = useState(false);
   const mon = me.mon.balance;
@@ -205,13 +206,19 @@ function WalletCard({ me, isPasskey }: { me: Me; isPasskey: boolean }) {
 
       <div className="flex gap-2 bg-brand-press/60 p-3 sm:p-4">
         <Link href="/deposit" className={`${action} bg-white text-brand hover:bg-wash`}>
-          <Icon d="M12 5v14M5 12l7 7 7-7" />
+          <WalletGlyph name="deposit" />
           Deposit
         </Link>
         {me.swap && (
           <Link href="/swap" className={`${action} bg-white/15 text-white hover:bg-white/25`}>
-            <Icon d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />
+            <WalletGlyph name="swap" />
             Swap
+          </Link>
+        )}
+        {me.withdraw.open && (
+          <Link href="/withdraw" className={`${action} bg-white/15 text-white hover:bg-white/25`}>
+            <WalletGlyph name="withdraw" />
+            Withdraw
           </Link>
         )}
       </div>

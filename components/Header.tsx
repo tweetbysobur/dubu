@@ -9,6 +9,7 @@ import { formatChog, formatMon, TIER_NAME, type Me, type TierId } from "@/lib/ap
 import { LevelBadge, LevelMark } from "./LevelBadge";
 import { Logo } from "./Logo";
 import { TokenIcon } from "./TokenIcon";
+import { WalletGlyph } from "./WalletGlyphs";
 import { buttonClass, Spinner } from "./ui";
 
 function short(a: string) {
@@ -93,8 +94,9 @@ function SignOutButton({ onDone }: { onDone: () => void }) {
 }
 
 /** Desktop account dropdown. */
-function AccountMenu({ address, tier, swap }: { address: string; tier: TierId; swap: boolean }) {
+function AccountMenu({ address, tier, swap, withdraw }: { address: string; tier: TierId; swap: boolean; withdraw: boolean }) {
   const [open, setOpen] = useState(false);
+  const actions = walletActions(swap, withdraw);
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(open, () => setOpen(false), ref);
 
@@ -118,15 +120,12 @@ function AccountMenu({ address, tier, swap }: { address: string; tier: TierId; s
           <LevelBadge tier={tier} size="sm" />
           <p className="mt-2 break-all text-sm font-medium tabular-nums">{address}</p>
           <div className="mt-4 grid gap-2">
-            <div className={`grid gap-2 ${swap ? "grid-cols-2" : ""}`}>
-              <Link href="/deposit" onClick={() => setOpen(false)} className={buttonClass("primary")}>
-                Deposit
-              </Link>
-              {swap && (
-                <Link href="/swap" onClick={() => setOpen(false)} className={buttonClass("ghost")}>
-                  Swap
+            <div className={`grid gap-2 ${actions.length === 3 ? "grid-cols-3" : actions.length === 2 ? "grid-cols-2" : ""}`}>
+              {actions.map((a, i) => (
+                <Link key={a.href} href={a.href} onClick={() => setOpen(false)} className={`${buttonClass(i === 0 ? "primary" : "ghost")} !px-2`}>
+                  {a.label}
                 </Link>
-              )}
+              ))}
             </div>
             <Link href="/profile" onClick={() => setOpen(false)} className={buttonClass("ghost")}>
               Profile and linked wallets
@@ -191,6 +190,7 @@ function MobileMenu({ links, me, signInHref }: { links: NavLink[]; me: Me | null
   }
 
   const close = () => setOpen(false);
+  const actions = me ? walletActions(me.swap, me.withdraw.open) : [];
 
   return (
     <div ref={ref} className="sm:hidden">
@@ -247,25 +247,20 @@ function MobileMenu({ links, me, signInHref }: { links: NavLink[]; me: Me | null
                 )}
               </div>
 
-              <div className={`mt-4 grid gap-2 ${me.swap ? "grid-cols-2" : ""}`}>
-                <Link
-                  href="/deposit"
-                  onClick={close}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white text-[15px] font-semibold text-brand hover:bg-wash"
-                >
-                  <Glyph d="M12 5v14M5 12l7 7 7-7" size={18} />
-                  Deposit
-                </Link>
-                {me.swap && (
+              <div className={`mt-4 grid gap-2 ${actions.length === 3 ? "grid-cols-3" : actions.length === 2 ? "grid-cols-2" : ""}`}>
+                {actions.map((a, i) => (
                   <Link
-                    href="/swap"
+                    key={a.href}
+                    href={a.href}
                     onClick={close}
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand-press text-[15px] font-semibold text-white hover:bg-ink/40"
+                    className={`flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-[15px] font-semibold ${
+                      i === 0 ? "bg-white text-brand hover:bg-wash" : "bg-brand-press text-white hover:bg-ink/40"
+                    }`}
                   >
-                    <Glyph d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" size={18} />
-                    Swap
+                    <WalletGlyph name={a.glyph} size={18} />
+                    {a.label}
                   </Link>
-                )}
+                ))}
               </div>
             </section>
           )}
@@ -335,6 +330,17 @@ function MobileMenu({ links, me, signInHref }: { links: NavLink[]; me: Me | null
   );
 }
 
+type WalletAction = { href: string; label: string; glyph: "deposit" | "swap" | "withdraw" };
+
+/** Deposit always; Swap and Withdraw when they are open to this account. */
+function walletActions(swap: boolean, withdraw: boolean): WalletAction[] {
+  return [
+    { href: "/deposit", label: "Deposit", glyph: "deposit" as const },
+    ...(swap ? [{ href: "/swap", label: "Swap", glyph: "swap" as const }] : []),
+    ...(withdraw ? [{ href: "/withdraw", label: "Withdraw", glyph: "withdraw" as const }] : []),
+  ];
+}
+
 export function Header() {
   const pathname = usePathname();
   const me = useMe();
@@ -391,7 +397,7 @@ export function Header() {
               );
             })}
           </nav>
-          {signedIn && me.data && <AccountMenu address={me.data.address} tier={me.data.tier} swap={me.data.swap} />}
+          {signedIn && me.data && <AccountMenu address={me.data.address} tier={me.data.tier} swap={me.data.swap} withdraw={me.data.withdraw.open} />}
           {!signedIn && me.data === null && (!landing || heroCtaOffscreen) && (
             <a href={signInHref} className={buttonClass("primary")}>
               Sign in

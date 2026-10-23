@@ -58,6 +58,16 @@ function nadRouters(): Set<string> {
   return new Set([cfg.nadCurveRouter, cfg.nadDexRouter].filter(Boolean).map((a) => a!.toLowerCase()));
 }
 
+/** CHOG's address from config, or null. */
+export function chogAddress() {
+  return cfg.chog;
+}
+
+/** Every token and router contract Dubu knows. Never a place to send funds to by hand. */
+export function knownContracts(): Set<string> {
+  return new Set(Object.values(cfg).filter(Boolean).map((a) => a!.toLowerCase()));
+}
+
 export function swapConfigured() {
   return !activeChain.testnet && (nadfunReady() || uniswapReady());
 }

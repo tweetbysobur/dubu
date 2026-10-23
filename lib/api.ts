@@ -58,6 +58,8 @@ export type Me = {
   mon: { balance: string | null };
   /** True when this account can use the MON to CHOG swap. */
   swap: boolean;
+  /** Sending MON (and CHOG, when configured) out of the sign-in wallet. */
+  withdraw: { open: boolean; chog: boolean };
   used: number;
   limit: number;
   mock: boolean;

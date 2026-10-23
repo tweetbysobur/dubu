@@ -23,7 +23,7 @@ const SECTIONS = [
   { id: "prompts", title: "Write a good prompt" },
   { id: "download", title: "Download" },
   { id: "wallets", title: "Link a wallet" },
-  { id: "wallet", title: "Deposit and swap" },
+  { id: "wallet", title: "Deposit, swap, withdraw" },
   { id: "safety", title: "Safety" },
   { id: "help", title: "Fix a problem" },
 ] as const;
@@ -311,7 +311,7 @@ export default function DocsPage() {
               </p>
             </Section>
 
-            <Section id="wallet" title="Deposit and swap">
+            <Section id="wallet" title="Deposit, swap, withdraw">
               <p>
                 Your Dubu wallet is a normal Monad wallet. Profile shows its MON and CHOG. Tap Deposit for its address and
                 QR code, then send MON on the Monad network only.
@@ -335,6 +335,15 @@ export default function DocsPage() {
               ) : (
                 <p>Swapping between MON and CHOG inside Dubu is coming soon.</p>
               )}
+              <p>
+                <Link href="/withdraw" className={a}>
+                  Withdraw
+                </Link>{" "}
+                sends MON or CHOG from your Dubu wallet to any Monad address. Paste the address, check it in the review (it
+                is shown in full, in groups of four), then confirm once. Max on MON keeps back exactly the network fee. Dubu
+                refuses addresses that would lose the funds: the zero address, your own wallet, and token or exchange
+                contracts. If you send to an exchange, make sure it accepts Monad deposits. A withdrawal cannot be undone.
+              </p>
             </Section>
 
             <Section id="safety" title="Safety">

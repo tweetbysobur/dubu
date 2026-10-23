@@ -7,6 +7,7 @@ import { getUsed, softBurst } from "@/lib/limits";
 import { MOCK } from "@/lib/video";
 import { fail } from "@/lib/http";
 import { swapAvailableFor } from "@/lib/swap";
+import { chogWithdrawable, withdrawOpen } from "@/lib/withdraw";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ export async function GET() {
     chog: status.chog,
     mon: { balance: await mon },
     swap: swapAvailableFor(address),
+    withdraw: { open: withdrawOpen(), chog: chogWithdrawable() },
     used,
     limit: dailyLimit(tier),
     mock: MOCK,
