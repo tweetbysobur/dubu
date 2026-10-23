@@ -15,7 +15,9 @@ import {
   reserveFreeIp,
   reserveUse,
 } from "@/lib/limits";
-import { createVideo, VideoBusyError } from "@/lib/video";
+import { createVideo, loadImage, VideoBusyError } from "@/lib/video";
+import { planFor, stagePrompt, STAGE_NEGATIVE } from "@/lib/intent";
+import { padForStage, saveContext, stagingEnabled, submitStage } from "@/lib/stage";
 import { encodeJob } from "@/lib/jobs";
 import { fail, readJson } from "@/lib/http";
 import { direct, expandPrompt } from "@/lib/director";
@@ -142,6 +144,27 @@ export async function POST(req: Request) {
     }
   }
 
+  // The plan: can this action happen inside the picture, or does it need a scene first?
+  const plan = planFor(prompt);
+  if (stagingEnabled() && plan.path !== "direct") {
+    try {
+      const { bytes } = await loadImage(image);
+      const editId = await submitStage(await padForStage(bytes), stagePrompt(plan, prompt), STAGE_NEGATIVE);
+      await saveContext(editId, {
+        idea: prompt,
+        tier,
+        direct: body.direct !== false,
+        chog: chog ? { name: chog.name, traits: chog.traits } : null,
+        matched: plan.matched,
+      });
+      const id = encodeJob({ id: `stage:${editId}`, address, tier, prompt, createdAt: Date.now() });
+      return NextResponse.json({ id, tier, used, limit, shot: null, plan: { path: plan.path, matched: plan.matched } });
+    } catch (e) {
+      // Staging is an upgrade, never a blocker: film the original picture instead.
+      console.error("[generate] staging failed, filming the original", e);
+    }
+  }
+
   let providerId: string;
   try {
     providerId = await createVideo({ tier, image, prompt: finalPrompt });
@@ -156,5 +179,5 @@ export async function POST(req: Request) {
   }
 
   const id = encodeJob({ id: providerId, address, tier, prompt, shot: shot ?? undefined, createdAt: Date.now() });
-  return NextResponse.json({ id, tier, used, limit, shot });
+  return NextResponse.json({ id, tier, used, limit, shot, plan: { path: "direct", matched: plan.matched } });
 }

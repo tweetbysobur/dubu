@@ -1,6 +1,7 @@
 import type { ChogToken } from "./chog";
 import { fetchImage } from "./images";
 import type { Tier } from "./tiers";
+import { buildPrompt, interpret, keepsIntent } from "./interpret";
 
 /**
  * The director: one language-model call before each render. It looks at the image and
@@ -25,22 +26,15 @@ const TIMEOUT_MS = 15_000;
 const MAX_SHOT = 1400;
 
 /**
- * Used when the director is off or unavailable. A bare sentence like "dancing
- * in the rain" is too short for the video model, which then makes generic,
- * barely moving clips. This wraps it in the structure the model follows best,
- * without changing what the person asked for.
+ * Used when the director is off, unavailable, or its shot dropped the user's action.
+ * The deterministic interpreter (lib/interpret.ts) rebuilds the caption into one clear
+ * instruction from only the user's own parts, and keeps the user's words verbatim.
  */
 export function expandPrompt(prompt: string, chog?: ChogToken | null) {
-  const who = chog ? `${chog.name}, the character from the image,` : "The main character from the image";
   const traits = chog?.traits.length
-    ? ` It keeps its traits: ${chog.traits.map((t) => `${t.trait_type.toLowerCase()} ${t.value}`).join(", ")}.`
-    : "";
-  return [
-    `${who} ${prompt.replace(/[.!?]+$/, "")}.`,
-    "The action starts right away and stays the focus for the whole clip, with clear, natural motion and small details like blinking and breathing.",
-    "The camera holds steady with a slow push in.",
-    `It keeps exactly the same face, colors, outfit and art style as the image, and the same lighting throughout.${traits}`,
-  ].join(" ");
+    ? `It keeps its traits: ${chog.traits.map((t) => `${t.trait_type.toLowerCase()} ${t.value}`).join(", ")}.`
+    : null;
+  return buildPrompt(interpret(prompt), traits);
 }
 
 export function directorEnabled() {
@@ -61,14 +55,14 @@ const SYSTEM = `You direct short image-to-video clips for Dubu. People upload a 
 The person's intent comes first:
 - The action they asked for must happen, clearly, starting in the first second, and stay the main thing on screen. Never swap it for a different or "safer" action, never water it down, never add a second unrelated action.
 - Keep every specific they gave: objects, places, emotions, direction, speed, style. If they wrote "waves with the left paw", the left paw waves.
-- If the idea is vague ("make it cool"), choose one clear, fun action that fits the character.
+- Never add an action, place, prop, effect or camera move the person did not ask for. If the idea is vague ("make it cool"), keep it minimal: subtle natural motion like blinking, breathing and a small head movement, nothing new in the scene.
 
 How LTX-2.3 follows a prompt best:
 - One flowing paragraph in present tense, 60 to 150 words. No lists, no quotes, no headings.
 - The image already sets who the character is and the composition. Spend the words on motion: write the action as a short chain of beats (it lifts its head, then grins, then waves), with the physical results (ears bounce, fur ruffles, rain splashes off its shoulders).
 - Name small life motions so nothing freezes: blinking, breathing, a slight sway.
-- Give motion a direction (wind from left to right, it walks toward the camera).
-- One camera move only, slow and steady: static, slow push in, gentle orbit or slow pan. Close-ups stay steady.
+- Give the requested motion a direction when it helps (it walks toward the camera), without adding new motion.
+- Camera: use exactly the move the person asked for. If they named none, keep the camera steady.
 - Keep the character exactly as in the image: same face, colors, outfit, accessories and art style (cartoon stays cartoon, pixel art stays pixel art). Restate the image's lighting and colors so they do not drift.
 - No cuts, no scene changes, no on-screen text.
 - Never add real people's names, brands or logos, or anything sexual, violent or hateful, even if asked.
@@ -97,6 +91,18 @@ async function imageBlock(image: string) {
   const fetched = await fetchImage(image).catch(() => null);
   if (!fetched || !/^image\/(png|jpeg|webp|gif)$/.test(fetched.type)) return null;
   return { type: "image", source: { type: "base64", media_type: fetched.type, data: Buffer.from(fetched.body).toString("base64") } };
+}
+
+/** The deterministic reading of the caption, so the director works from the same parts. */
+function parsed(prompt: string) {
+  const i = interpret(prompt);
+  if (i.vague) return `Parsed request: vague, no concrete action. Keep motion minimal.${i.camera ? ` Camera asked for: ${i.camera}.` : " Camera: steady."}`;
+  return [
+    `Parsed request. Action: ${i.action}.`,
+    `Setting: ${i.setting ?? "none named, keep the image's own"}.`,
+    `Effects: ${i.effects.length ? i.effects.join(", ") : "none named, add none"}.`,
+    `Camera: ${i.camera ?? "none named, keep steady"}.`,
+  ].join(" ");
 }
 
 function clean(s: string) {
@@ -133,7 +139,7 @@ export async function direct(args: { prompt: string; image: string; tier: Tier; 
         messages: [
           {
             role: "user",
-            content: [img, { type: "text", text: `${context}\n\nThe user's idea: ${prompt}` }],
+            content: [img, { type: "text", text: `${context}\n\nThe user's idea: ${prompt}\n\n${parsed(prompt)}` }],
           },
         ],
       }),
@@ -153,7 +159,13 @@ export async function direct(args: { prompt: string; image: string; tier: Tier; 
       return { kind: "rejected", reason };
     }
     const shot = typeof out.shot === "string" ? clean(out.shot) : "";
-    return shot.length >= 40 ? { kind: "shot", shot } : { kind: "skipped" };
+    if (shot.length < 40) return { kind: "skipped" };
+    // The shot must still carry the user's action; if it dropped it, use the interpreter's prompt.
+    if (!keepsIntent(interpret(prompt), shot)) {
+      console.error("[director] shot dropped the requested action, using the interpreter");
+      return { kind: "skipped" };
+    }
+    return { kind: "shot", shot };
   } catch (e) {
     console.error("[director] failed, using the user's prompt", e instanceof Error ? e.message : e);
     return { kind: "skipped" };

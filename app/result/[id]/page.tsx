@@ -116,7 +116,10 @@ export default function ResultPage() {
 
         {failed && (
           <div className="mt-8 space-y-5">
-            <Alert>{job.data?.error ?? "Generation failed."} This still counts toward today's videos.</Alert>
+            <Alert>
+              {job.data?.error ?? "Generation failed."}
+              {job.data?.error?.includes("did not count") ? "" : " This still counts toward today's videos."}
+            </Alert>
             <Link href="/studio" className={buttonClass("primary")}>
               Try another prompt
             </Link>

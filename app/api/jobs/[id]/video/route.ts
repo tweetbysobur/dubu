@@ -1,6 +1,7 @@
 import { getSessionAddress } from "@/lib/session";
 import { decodeJob } from "@/lib/jobs";
-import { getVideo, videoFetchHeaders } from "@/lib/video";
+import { videoFetchHeaders } from "@/lib/video";
+import { progress } from "@/lib/film";
 import { fail } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   let v;
   try {
-    v = await getVideo(job.id);
+    v = await progress(job);
   } catch {
     return fail(502, "Could not reach the video service.");
   }
@@ -26,7 +27,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   let upstream: Response;
   try {
     upstream = await fetch(v.url, {
-      headers: { ...videoFetchHeaders(job.id, v.url), ...(range ? { range } : {}) },
+      headers: { ...videoFetchHeaders(v.videoId ?? job.id, v.url), ...(range ? { range } : {}) },
       signal: AbortSignal.timeout(30_000),
     });
   } catch {

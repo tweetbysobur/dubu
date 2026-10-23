@@ -51,7 +51,7 @@ export function videoFetchHeaders(jobId: string, url: string): Record<string, st
 // ---------- shared image handling ----------
 
 /** Turns a data URL or a remote URL into bytes, with a size cap. */
-async function loadImage(image: string): Promise<{ bytes: Buffer; type: string }> {
+export async function loadImage(image: string): Promise<{ bytes: Buffer; type: string }> {
   const m = image.match(/^data:(image\/[a-z]+);base64,(.+)$/);
   if (m) return { bytes: Buffer.from(m[2], "base64"), type: m[1] };
 

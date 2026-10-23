@@ -152,3 +152,25 @@ export async function remove(key: string): Promise<void> {
   }
   memStr.delete(key);
 }
+
+/** Stores a string that expires on its own. */
+export async function putText(key: string, value: string, ttlSec: number): Promise<void> {
+  if (persistent) {
+    await pipeline([["SET", key, value, "EX", ttlSec]]);
+    return;
+  }
+  memStr.set(key, value);
+}
+
+export const getText = readString;
+
+/** Like claim, but the claim expires, so a crashed holder never blocks forever. */
+export async function setOnce(key: string, value: string, ttlSec: number): Promise<boolean> {
+  if (persistent) {
+    const [r] = await pipeline([["SET", key, value, "NX", "EX", ttlSec]]);
+    return r === "OK";
+  }
+  if (memStr.has(key)) return false;
+  memStr.set(key, value);
+  return true;
+}
