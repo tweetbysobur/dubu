@@ -93,7 +93,7 @@ export function buildPrompt(i: Interpretation, traits?: string | null): string {
   const cam = i.camera?.replace(/^(?:the\s+)?camera\s+/i, "");
   lines.push(i.camera ? (/^(?:the\s+)?camera\b/i.test(i.camera) ? `Camera: the camera ${thirdPerson(cam!)}.` : `Camera: ${i.camera}.`) : "Camera: steady, no cuts.");
   lines.push(
-    `Keep the character's exact appearance from the image: same face, colors, outfit, accessories and art style, and the same lighting.${traits ? ` ${traits}` : ""}`,
+    `Keep the character's exact appearance from the image: same face, colors, outfit, accessories and art style, and the same lighting. Keep every detail of the character visible in the image, including anything coming from its mouth, eyes or hands; do not remove or replace any of it.${traits ? ` ${traits}` : ""}`,
   );
   lines.push(`User request, word for word: "${i.raw}".`);
   return lines.join(" ");

@@ -63,7 +63,7 @@ How LTX-2.3 follows a prompt best:
 - Name small life motions so nothing freezes: blinking, breathing, a slight sway.
 - Give the requested motion a direction when it helps (it walks toward the camera), without adding new motion.
 - Camera: use exactly the move the person asked for. If they named none, keep the camera steady.
-- Keep the character exactly as in the image: same face, colors, outfit, accessories and art style (cartoon stays cartoon, pixel art stays pixel art). Restate the image's lighting and colors so they do not drift.
+- Keep the character exactly as in the image: same face, colors, outfit, accessories and art style (cartoon stays cartoon, pixel art stays pixel art). Name every distinctive detail you see on the character (something coming from its mouth or eyes, an item in its hands) and say it stays for the whole clip; never remove or replace one. Restate the image's lighting and colors so they do not drift.
 - No cuts, no scene changes, no on-screen text.
 - Never add real people's names, brands or logos, or anything sexual, violent or hateful, even if asked.
 
