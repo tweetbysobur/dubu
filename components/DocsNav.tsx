@@ -66,7 +66,7 @@ export function DocsNav({ groups }: { groups: DocsGroup[] }) {
             <path d="M6 9l6 6 6-6" />
           </svg>
         </summary>
-        <div className="border-t border-line px-4 py-4">
+        <div className="max-h-[60dvh] overflow-y-auto overscroll-contain border-t border-line px-4 py-4">
           {list(() => document.querySelector<HTMLDetailsElement>("details[open]")?.removeAttribute("open"))}
         </div>
       </details>

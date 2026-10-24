@@ -50,12 +50,12 @@ const a = "font-semibold text-brand underline-offset-4 hover:underline";
 
 function Section({ id, title, lead, children }: { id: string; title: string; lead?: ReactNode; children: ReactNode }) {
   return (
-    <section id={id} aria-labelledby={`${id}-h`} className="scroll-mt-24 border-t border-line pt-12 first:border-t-0 first:pt-0">
-      <h2 id={`${id}-h`} className="font-display text-[30px] font-extrabold leading-tight tracking-[-0.035em] sm:text-[34px]">
+    <section id={id} aria-labelledby={`${id}-h`} className="scroll-mt-40 border-t border-line pt-10 first:border-t-0 first:pt-0 md:scroll-mt-24 sm:pt-12">
+      <h2 id={`${id}-h`} className="font-display text-[26px] font-extrabold leading-tight tracking-[-0.03em] sm:text-[34px] sm:tracking-[-0.035em]">
         {title}
       </h2>
-      {lead && <p className="mt-3 text-lg leading-relaxed text-mute">{lead}</p>}
-      <div className="mt-6 space-y-5 text-[17px] leading-relaxed text-ink/90">{children}</div>
+      {lead && <p className="mt-2 text-base leading-relaxed text-mute sm:mt-3 sm:text-lg">{lead}</p>}
+      <div className="mt-5 space-y-5 text-base leading-relaxed text-ink/90 sm:mt-6 sm:text-[17px]">{children}</div>
     </section>
   );
 }
@@ -121,51 +121,46 @@ function unlocks(tier: Tier, min: string | null) {
 export default function DocsPage() {
   const seconds = clipSeconds();
   const min = chogMinSetting();
-  const tiers = TIERS.filter((t) => t !== "token" || min);
+  // Lowest level first, so the cards read as the way up.
+  const tiers = [...TIERS].reverse().filter((t) => t !== "token" || min);
   const swap = swapOpen();
   const director = directorEnabled();
   const withdraw = withdrawOpen();
 
   return (
     <main>
-      <div className="border-b border-line bg-surface">
-        <Container className="py-12 sm:py-16">
-          <h1 className="font-display text-[46px] font-extrabold leading-[0.95] tracking-[-0.045em] sm:text-[64px]">Docs</h1>
-          <p className="mt-4 max-w-[40rem] text-lg leading-relaxed text-mute sm:text-xl">
-            How to turn your Chog, or any image, into a short video or GIF. How levels work. How to use your Dubu wallet. Short
-            answers live in the{" "}
+      <div className="border-b border-line">
+        <Container className="pb-6 pt-8 sm:pb-10 sm:pt-14">
+          <h1 className="font-display text-[34px] font-extrabold leading-none tracking-[-0.04em] sm:text-[52px]">Docs</h1>
+          <p className="mt-3 max-w-[40rem] text-base leading-relaxed text-mute sm:text-lg">
+            Make videos from your Chog or any image, level up, and use your Dubu wallet. Quick answers are in the{" "}
             <Link href="/faq" className={a}>
               FAQ
             </Link>
             .
           </p>
-
           <a
             href="#rules"
-            className="mt-8 flex max-w-[44rem] items-start gap-4 rounded-3xl bg-brand p-5 text-white transition-colors hover:bg-brand-press sm:p-6"
+            className="mt-5 inline-flex max-w-full items-center gap-2.5 rounded-full border border-brand/20 bg-wash py-2 pl-3 pr-4 text-sm font-medium text-ink transition-colors hover:border-brand/40 sm:text-[15px]"
           >
-            <svg aria-hidden width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
+            <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F4FFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
               <path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z" />
               <path d="M9 12l2 2 4-4" />
             </svg>
-            <span>
-              <span className="block font-display text-xl font-bold tracking-[-0.02em]">Dubu is for good, creative fun</span>
-              <span className="mt-1 block leading-relaxed text-white/90">
-                Bring your characters to life. No nudity, no sexual content, no gore, no hate, nothing involving children in a
-                harmful way, and no real people without their permission. Read the content rules.
-              </span>
+            <span className="min-w-0">
+              For good, creative fun only. <span className="font-semibold text-brand">Content rules</span>
             </span>
           </a>
         </Container>
       </div>
 
-      <Container className="py-12 sm:py-16">
-        <div className="grid gap-10 md:grid-cols-[14rem_minmax(0,1fr)] md:gap-16">
-          <div className="md:sticky md:top-24 md:max-h-[calc(100dvh-7rem)] md:self-start md:overflow-y-auto md:pb-6">
+      <Container className="pb-12 pt-0 sm:pb-16 md:pt-14">
+        <div className="grid gap-8 md:grid-cols-[14rem_minmax(0,1fr)] md:gap-16">
+          <div className="sticky top-[var(--header-h,65px)] z-10 -mx-4 bg-white px-4 py-3 md:top-24 md:mx-0 md:max-h-[calc(100dvh-7rem)] md:self-start md:overflow-y-auto md:bg-transparent md:p-0 md:pb-6">
             <DocsNav groups={GROUPS} />
           </div>
 
-          <div className="max-w-[46rem] space-y-12">
+          <div className="max-w-[46rem] space-y-10 sm:space-y-12">
             <Section
               id="overview"
               title="What Dubu is"
